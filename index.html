@@ -336,12 +336,19 @@ const IN_GAS = typeof google !== 'undefined' && google.script && google.script.r
 const CRM_API = 'https://script.google.com/macros/s/AKfycbzdQNwuZRO6wcQvKfSwxIgPf7BSGAYnvTmuo9929qPp_ZgjHCsE0FWBBc7nlByVH-Tzew/exec';
 const CRM_KEY = (() => {
   const injected = /^[A-Za-z0-9]{24,64}$/.test(window.CRM_KEY || '') ? window.CRM_KEY : '';
-  if (injected) return injected;
+  if (injected) {
+    try { if (localStorage.getItem('sk-crm-key-v1') !== injected) { localStorage.removeItem('sk-crm-data-v1'); localStorage.removeItem('sk-crm-user-v1'); localStorage.setItem('sk-crm-key-v1', injected); } } catch (e) {}
+    return injected;
+  }
   // своя страница: ключ из ?k=..., запоминаем. Ключ остаётся в адресе, чтобы ссылку можно было скопировать в другой браузер
   let k = '';
   try { k = new URLSearchParams(location.search).get('k') || ''; } catch (e) {}
   if (/^[A-Za-z0-9]{24,64}$/.test(k)) {
-    try { localStorage.setItem('sk-crm-key-v1', k); } catch (e) {}
+    try {
+      // другой человек на этом устройстве — стираем чужие сохранённые данные
+      if (localStorage.getItem('sk-crm-key-v1') !== k) { localStorage.removeItem('sk-crm-data-v1'); localStorage.removeItem('sk-crm-user-v1'); }
+      localStorage.setItem('sk-crm-key-v1', k);
+    } catch (e) {}
     return k;
   }
   try { k = localStorage.getItem('sk-crm-key-v1') || ''; } catch (e) {}
