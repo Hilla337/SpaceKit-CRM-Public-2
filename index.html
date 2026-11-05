@@ -332,15 +332,17 @@ const CRM_API = 'https://script.google.com/macros/s/AKfycbzdQNwuZRO6wcQvKfSwxIgP
 const CRM_KEY = (() => {
   const injected = /^[A-Za-z0-9]{24,64}$/.test(window.CRM_KEY || '') ? window.CRM_KEY : '';
   if (injected) return injected;
-  // своя страница: ключ из ?k=..., запоминаем и убираем из адресной строки
+  // своя страница: ключ из ?k=..., запоминаем. Ключ остаётся в адресе, чтобы ссылку можно было скопировать в другой браузер
   let k = '';
   try { k = new URLSearchParams(location.search).get('k') || ''; } catch (e) {}
   if (/^[A-Za-z0-9]{24,64}$/.test(k)) {
-    try { localStorage.setItem('sk-crm-key-v1', k); history.replaceState(null, '', location.pathname); } catch (e) {}
+    try { localStorage.setItem('sk-crm-key-v1', k); } catch (e) {}
     return k;
   }
   try { k = localStorage.getItem('sk-crm-key-v1') || ''; } catch (e) {}
-  return /^[A-Za-z0-9]{24,64}$/.test(k) ? k : '';
+  if (!/^[A-Za-z0-9]{24,64}$/.test(k)) return '';
+  try { history.replaceState(null, '', location.pathname + '?k=' + k); } catch (e) {}
+  return k;
 })();
 const LOGO = window.CRM_LOGO;
 const S = {
