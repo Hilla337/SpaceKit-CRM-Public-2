@@ -391,7 +391,7 @@ const CRM_API = 'https://script.google.com/macros/s/AKfycbzdQNwuZRO6wcQvKfSwxIgP
 const CRM_KEY = (() => {
   const injected = /^[A-Za-z0-9]{24,64}$/.test(window.CRM_KEY || '') ? window.CRM_KEY : '';
   if (injected) {
-    try { if (localStorage.getItem('sk-crm-key-v1') !== injected) { localStorage.removeItem('sk-crm-data-v1'); localStorage.removeItem('sk-crm-user-v1'); localStorage.setItem('sk-crm-key-v1', injected); } } catch (e) {}
+    try { if (localStorage.getItem('sk-crm-key-v1') !== injected) { localStorage.removeItem('sk-crm-data-v2'); localStorage.removeItem('sk-crm-user-v1'); localStorage.setItem('sk-crm-key-v1', injected); } } catch (e) {}
     return injected;
   }
   // своя страница: ключ из ?k=..., запоминаем. Ключ остаётся в адресе, чтобы ссылку можно было скопировать в другой браузер
@@ -400,7 +400,7 @@ const CRM_KEY = (() => {
   if (/^[A-Za-z0-9]{24,64}$/.test(k)) {
     try {
       // другой человек на этом устройстве — стираем чужие сохранённые данные
-      if (localStorage.getItem('sk-crm-key-v1') !== k) { localStorage.removeItem('sk-crm-data-v1'); localStorage.removeItem('sk-crm-user-v1'); }
+      if (localStorage.getItem('sk-crm-key-v1') !== k) { localStorage.removeItem('sk-crm-data-v2'); localStorage.removeItem('sk-crm-user-v1'); }
       localStorage.setItem('sk-crm-key-v1', k);
     } catch (e) {}
     return k;
@@ -506,9 +506,9 @@ async function action(name, payload) {
 }
 
 // ---------- данные ----------
-const LS_KEY = 'sk-crm-data-v1';
+const LS_KEY = 'sk-crm-data-v2';
 function setData(d) {
-  d.ops = (d.ops || []).map(r => ({ row: r[0], date: r[1], type: r[2], acc: r[3], to: r[4], amount: r[5], cat: r[6], cp: r[7], client: r[8], comment: r[9], check: r[10] }));
+  d.ops = (d.ops || []).map(r => Array.isArray(r) ? ({ row: r[0], date: r[1], type: r[2], acc: r[3], to: r[4], amount: r[5], cat: r[6], cp: r[7], client: r[8], comment: r[9], check: r[10] }) : r);
   d.opsDesc = d.ops.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.row - a.row);
   S.data = d;
   S.loadedAt = d.ts || Date.now();
@@ -519,8 +519,9 @@ async function load(fresh) {
   try {
     const j = await call('/api/data' + (fresh ? '?fresh=1' : ''));
     if (!j.ok) throw new Error(j.error || 'Не удалось загрузить данные');
+    let raw = ''; try { raw = JSON.stringify(j.result); } catch (e) {}   // кэш — до того, как setData превратит операции в объекты
     setData(j.result);
-    try { localStorage.setItem(LS_KEY, JSON.stringify(j.result)); } catch (e) {}
+    try { if (raw) localStorage.setItem(LS_KEY, raw); } catch (e) {}
   } catch (e) { toast(e.message); }
   S.loading = false;
   render();
