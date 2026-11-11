@@ -416,7 +416,7 @@ const S = {
   view: 'home',
   money: { type: 'all', acc: '', month: '', q: '', errors: false, limit: 80 },
   req: { tab: 'active', q: '' },
-  cli: { tab: 'clients', q: '' },
+  cli: { tab: 'all', q: '', role: '', period: 'all' },
   debt: { tab: 'debts', period: 'month' },
   report: { preset: 'month', from: '', to: '', acc: '', open: '' },
 };
@@ -551,6 +551,79 @@ const driverNames = () => {
 const opNames = () => { const c = new Map(); (S.data && S.data.ops || []).forEach(o => { const n = String(o.cp || '').trim(); if (n && n.length < 60) c.set(n, (c.get(n) || 0) + 1); }); return [...c.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]); };
 const allNames = () => [...new Set([].concat(contractors(), clientNames(), driverNames()).sort((a, b) => a.localeCompare(b, 'ru')).concat(opNames()))];
 
+// ---------- контрагенты: только из справочника ----------
+// Новых контрагентов не создаём: имя должно быть в СПРАВОЧНИКЕ. При опечатке подсказываем ближайшее.
+const SHORT_NAMES = { 'женя': 'Евгений', 'жека': 'Евгений', 'ваня': 'Иван', 'стас': 'Станислав', 'илюха': 'Илья' };
+const cpNorm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[«»"'.,]/g, ' ').replace(/\s+/g, ' ').trim();
+const refNames = () => [...new Set(contractors())];
+function cpResolve(name) {
+  const n = cpNorm(name);
+  if (!n) return '';
+  const hit = refNames().find(x => cpNorm(x) === n);
+  if (hit) return hit;
+  if (SHORT_NAMES[n] && refNames().some(x => cpNorm(x) === cpNorm(SHORT_NAMES[n]))) return n.charAt(0).toUpperCase() + n.slice(1);
+  return '';
+}
+function cpDist(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 3) return 9;
+  const d = [];
+  for (let i = 0; i <= m; i++) d[i] = [i];
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+  }
+  return d[m][n];
+}
+function cpSuggest(name) {
+  const q = cpNorm(name);
+  if (q.length < 3) return [];
+  const lim = (q.length < 4 ? 0 : q.length <= 5 ? 1 : q.length <= 8 ? 2 : 3) + 1, single = !q.includes(' ');
+  return refNames().map(full => {
+    const f = cpNorm(full);
+    let d = cpDist(q, f);
+    if (single) f.split(' ').forEach(w => { if (w.length >= 4 && w !== f) d = Math.min(d, cpDist(q, w) + 0.5); });
+    if (q.length >= 4 && f.startsWith(q)) d = Math.min(d, 1);
+    return { name: full, d };
+  }).filter(x => x.d <= lim).sort((a, b) => a.d - b.d || a.name.length - b.name.length).slice(0, 3).map(x => x.name);
+}
+const cpRole = name => { const c = (S.data && S.data.refs.contractors || []).find(x => cpNorm(x.name) === cpNorm(name)); return c ? c.role : ''; };
+
+// Отчёт по каждому контрагенту за период: сколько мы им заплатили, сколько от них получили,
+// сколько потратили на заказы клиента (материалы, доставка, прочее) и его долг по листу ДОЛГИ.
+function cpPeriod(p) {
+  const t = todayISO(), y = t.slice(0, 4), m = t.slice(0, 7);
+  if (p === 'month') return [m + '-01', t];
+  if (p === 'prev') { const d = new Date(Date.UTC(+y, +m.slice(5) - 2, 1)); const pm = d.toISOString().slice(0, 7); return [pm + '-01', pm + '-31']; }
+  if (p === 'year') return [y + '-01-01', t];
+  return ['', ''];
+}
+function cpStatsAll(period) {
+  const [from, to] = cpPeriod(period);
+  const map = new Map();
+  const get = name => { const k = cpNorm(name); let x = map.get(k); if (!x) { x = { name, paid: 0, got: 0, spent: 0, mat: 0, del: 0, oth: 0, n: 0, last: '', cats: new Map() }; map.set(k, x); } return x; };
+  (S.data.ops || []).forEach(o => {
+    if (o.type === 'Перевод' || !o.date) return;
+    if (from && (o.date < from || o.date > to)) return;
+    const touch = (x) => { x.n++; if (o.date > x.last) x.last = o.date; };
+    if (o.type === 'Расход' && o.cp) { const x = get(o.cp); x.paid += o.amount; x.cats.set(o.cat || '—', (x.cats.get(o.cat || '—') || 0) + o.amount); touch(x); }
+    if (o.type === 'Приход') {
+      const who = o.client || o.cp;
+      if (who) { const x = get(who); x.got += o.amount; touch(x); }
+    }
+    if (o.type === 'Расход' && o.client && cpNorm(o.client) !== cpNorm(o.cp)) {
+      const x = get(o.client); x.spent += o.amount; touch(x);
+      if (/материал/i.test(o.cat)) x.mat += o.amount; else if (/доставк|разгруз/i.test(o.cat)) x.del += o.amount; else x.oth += o.amount;
+    }
+  });
+  const debts = new Map();
+  (S.data.debts || []).forEach(d => { if (d.left > 0) debts.set(cpNorm(d.who), (debts.get(cpNorm(d.who)) || 0) + d.left); });
+  map.forEach((x, k) => { x.debt = debts.get(k) || 0; });
+  debts.forEach((v, k) => { if (!map.has(k)) { const d = (S.data.debts || []).find(z => cpNorm(z.who) === k); const x = get(d.who); x.debt = v; } });
+  return map;
+}
+
 // ---------- оболочка ----------
 const NAV = [['home', 'Главная'], ['money', 'Деньги'], ['req', 'Заявки'], ['cli', 'Клиенты'], ['debt', 'Долги']];
 function shell(inner, fab) {
@@ -583,7 +656,7 @@ function bindCommon() {
   document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => go(b.dataset.nav));
   const r = $('#refresh'); if (r) r.onclick = () => load(true);
   const f = $('#fab');
-  if (f) f.onclick = () => ({ home: () => formOp(), money: () => formOp(), req: () => formRequest(), cli: () => formContact(S.cli.tab), debt: () => S.debt.tab === 'debts' ? formDebt() : formOp({ type: 'Расход', cat: 'Доставка и разгрузка' }) })[S.view]();
+  if (f) f.onclick = () => ({ home: () => formOp(), money: () => formOp(), req: () => formRequest(), cli: () => S.cli.tab === 'all' ? formOp() : formContact(S.cli.tab), debt: () => S.debt.tab === 'debts' ? formDebt() : formOp({ type: 'Расход', cat: 'Доставка и разгрузка' }) })[S.view]();
   document.querySelectorAll('[data-op]').forEach(el => el.onclick = () => opDetail(+el.dataset.op));
   document.querySelectorAll('[data-reqid]').forEach(el => el.onclick = () => reqDetail(+el.dataset.reqid));
   document.querySelectorAll('[data-client]').forEach(el => el.onclick = () => clientPage(el.dataset.client));
@@ -1007,8 +1080,8 @@ function formOp(pre = {}) {
     h += '<div class="field"><label>Комментарий</label><input id="f-comment" value="' + esc(pre.comment || '') + '" placeholder="Объект, за что"></div>';
     if (t === 'Перевод') h += '<div class="hint">Перевод — деньги переходят между кассами (ПО, снятие с ИП). Баланс компании не меняется. Клиента у переводов не указываем.</div>';
     h += '<div class="err" id="f-err"></div><button class="btn" id="f-save">Записать в таблицу</button>';
-    h += '<datalist id="dl-names">' + allNames().map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
-    h += '<datalist id="dl-clients">' + clientNames().map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
+    h += '<datalist id="dl-names">' + refNames().sort((a, b) => a.localeCompare(b, 'ru')).map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
+    h += '<datalist id="dl-clients">' + refNames().sort((a, b) => (cpRole(a) === 'Клиент' ? 0 : 1) - (cpRole(b) === 'Клиент' ? 0 : 1) || a.localeCompare(b, 'ru')).map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
     return h;
   };
   openSheet(draw(), function bind(sh) {
@@ -1029,6 +1102,20 @@ function formOp(pre = {}) {
       if (st.type === 'Перевод' && (!op.to || op.to === op.acc)) { err.textContent = 'Выбери, куда перевод'; return; }
       if (st.type !== 'Перевод' && !op.cat) { err.textContent = 'Выбери категорию'; return; }
       if (op.date > todayISO()) { err.textContent = 'Дата в будущем'; return; }
+      // контрагент и клиент — только из справочника; при опечатке предлагаем ближайшее имя кнопкой
+      if (st.type !== 'Перевод') {
+        for (const [f, what] of [['cp', 'Контрагента'], ['client', 'Клиента']]) {
+          if (!op[f]) continue;
+          const k = cpResolve(op[f]);
+          if (k) { op[f] = k; $('#f-' + f, sh).value = k; continue; }
+          const sug = cpSuggest(op[f]);
+          err.innerHTML = esc(what + ' «' + op[f] + '» нет в справочнике — новых не создаём. ') +
+            (sug.length ? 'Может, ' + sug.map(n => '<button class="chip" data-sug="' + f + '" data-v="' + esc(n) + '" style="margin:4px 4px 0 0">' + esc(n) + '</button>').join('') + '?' : 'Похожих нет: выбери из списка или оставь поле пустым. Новое имя добавляет Илья в СПРАВОЧНИК.');
+          err.querySelectorAll('[data-sug]').forEach(b => b.onclick = () => { $('#f-' + b.dataset.sug, sh).value = b.dataset.v; err.textContent = ''; });
+          $('#f-' + f, sh).focus();
+          return;
+        }
+      }
       err.textContent = '';
       const btn = $('#f-save', sh); btn.disabled = true; btn.textContent = 'Записываю…';
       try {
@@ -1161,15 +1248,38 @@ function contactHtml(headers, v, skip) {
 function viewCli() {
   const f = S.cli, q = norm(f.q);
   let h = topbar('Клиенты');
-  h += '<div class="seg">' + [['clients', 'Клиенты'], ['suppliers', 'Поставщики'], ['drivers', 'Доставщики']].map(([k, t]) => '<button data-ct="' + k + '" class="' + (f.tab === k ? 'on' : '') + '">' + t + '</button>').join('') + '</div>';
+  h += '<div class="seg">' + [['all', 'Отчёт'], ['clients', 'Клиенты'], ['suppliers', 'Поставщики'], ['drivers', 'Доставщики']].map(([k, t]) => '<button data-ct="' + k + '" class="' + (f.tab === k ? 'on' : '') + '">' + t + '</button>').join('') + '</div>';
   h += '<div class="search">' + ICONS.search + '<input id="cq" placeholder="Поиск" value="' + esc(f.q) + '"></div>';
-  if (f.tab === 'clients') {
-    const fin = new Map((S.data.clients || []).map(c => [norm(c.name), c]));
+  if (f.tab === 'all') {
+    const PERIODS = [['all', 'Всё время'], ['month', 'Этот месяц'], ['prev', 'Прошлый месяц'], ['year', 'Этот год']];
+    const ROLES = [...new Set((S.data.refs.contractors || []).map(c => c.role).filter(Boolean))];
+    const stats = cpStatsAll(f.period);
+    let names = refNames();
+    if (f.role) names = names.filter(n => cpRole(n) === f.role);
+    if (q) names = names.filter(n => norm(n).includes(q));
+    const st = n => stats.get(cpNorm(n)) || { paid: 0, got: 0, spent: 0, n: 0, debt: 0, last: '' };
+    names.sort((a, b) => { const x = st(a), y = st(b); return (y.paid + y.got + y.spent) - (x.paid + x.got + x.spent) || a.localeCompare(b, 'ru'); });
+    const tot = names.reduce((t, n) => { const x = st(n); t.paid += x.paid; t.got += x.got; t.debt += x.debt; return t; }, { paid: 0, got: 0, debt: 0 });
+    h += '<div class="chips">' + PERIODS.map(([k, t]) => '<button class="chip ' + (f.period === k ? 'on' : '') + '" data-cper="' + k + '">' + t + '</button>').join('') + '</div>';
+    h += '<div class="chips"><button class="chip ' + (!f.role ? 'on' : '') + '" data-crole="">Все</button>' + ROLES.map(r => '<button class="chip ' + (f.role === r ? 'on' : '') + '" data-crole="' + esc(r) + '">' + esc(r) + '</button>').join('') + '</div>';
+    h += '<div class="totals"><div><small>Мы заплатили</small><b class="num">' + money(tot.paid) + '</b></div><div><small>Получили</small><b class="num pos">' + money(tot.got) + '</b></div><div><small>Должны нам</small><b class="num">' + money(tot.debt) + '</b></div></div>';
+    h += '<div class="list">' + (names.length ? names.map(n => {
+      const x = st(n), role = cpRole(n);
+      const main = x.paid >= x.got ? ['заплатили', x.paid, ''] : ['получили', x.got, 'pos'];
+      const sub = [role, x.n ? x.n + ' ' + plural(x.n, 'операция', 'операции', 'операций') : 'нет операций', x.last ? 'посл. ' + short(x.last) : ''].filter(Boolean).join(' · ');
+      const extra = [x.paid && x.got ? (main[0] === 'заплатили' ? 'получили ' + money(x.got) : 'заплатили ' + money(x.paid)) : '', x.spent ? 'на заказы ' + money(x.spent) : '', x.debt ? 'должен ' + money(x.debt) : ''].filter(Boolean).join(' · ');
+      return '<div class="row" data-client="' + esc(n) + '"><div class="ico neutral">' + esc(n.replace(/^Да!\s*/, '').charAt(0)) + '</div><div class="body"><div class="t1">' + esc(n) + '</div><div class="t2">' + esc(sub) + (extra ? '<br>' + esc(extra) : '') + '</div></div>' +
+        '<div class="amt num ' + main[2] + '">' + (x.n ? money(main[1]) + '<small>' + main[0] + '</small>' : '—') + '</div></div>';
+    }).join('') : '<div class="empty">Ничего не нашлось</div>') + '</div>';
+    h += '<div class="stale">Контрагенты из СПРАВОЧНИКА. «Заплатили» — наши расходы на него, «получили» — его оплаты нам, «на заказы» — что потратили на заказы клиента, «должен» — из листа ДОЛГИ.</div>';
+  } else if (f.tab === 'clients') {
+    const fin = cpStatsAll('all');
     let names = clientNames();
     if (q) names = names.filter(n => norm(n).includes(q) || memo('clients').rows.some(r => norm(r.v[0]) === norm(n) && norm(r.v.join(' ')).includes(q)));
-    names.sort((a, b) => ((fin.get(norm(b)) || {}).paid || 0) - ((fin.get(norm(a)) || {}).paid || 0));
+    names.sort((a, b) => ((fin.get(cpNorm(b)) || {}).got || 0) - ((fin.get(cpNorm(a)) || {}).got || 0));
     h += '<div class="list">' + (names.length ? names.map(n => {
-      const m = fin.get(norm(n)) || { paid: 0, spent: 0 };
+      const m0 = fin.get(cpNorm(n)) || { got: 0, spent: 0 };
+      const m = { paid: m0.got, spent: m0.spent };
       const objs = memo('clients').rows.filter(r => norm(r.v[0]) === norm(n)).length;
       const margin = m.paid - m.spent;
       return '<div class="row" data-client="' + esc(n) + '"><div class="ico neutral">' + esc(n.replace(/^Да!\s*/, '').charAt(0)) + '</div><div class="body"><div class="t1">' + esc(n) + '</div><div class="t2">' +
@@ -1191,6 +1301,8 @@ function viewCli() {
 const money_ = n => money(n);
 function bindCli() {
   document.querySelectorAll('[data-ct]').forEach(b => b.onclick = () => { S.cli.tab = b.dataset.ct; S.cli.q = ''; rerender(); });
+  document.querySelectorAll('[data-cper]').forEach(b => b.onclick = () => { S.cli.period = b.dataset.cper; rerender(); });
+  document.querySelectorAll('[data-crole]').forEach(b => b.onclick = () => { S.cli.role = b.dataset.crole; rerender(); });
   document.querySelectorAll('[data-contact]').forEach(el => el.onclick = () => {
     const r = memo(S.cli.tab).rows.find(x => x.row === +el.dataset.contact);
     if (r) formContact(S.cli.tab, r);
@@ -1208,32 +1320,45 @@ function payoutsBy(cat, month) {
   });
   return map;
 }
-function clientPage(name) {
+function clientPage(name, period) {
   const n = norm(name);
-  const m = (S.data.clients || []).find(c => norm(c.name) === n) || { paid: 0, materials: 0, delivery: 0, other: 0, spent: 0 };
+  period = period || (S.cli.tab === 'all' ? S.cli.period : 'all');
+  const sx = cpStatsAll(period).get(cpNorm(name)) || { paid: 0, got: 0, spent: 0, mat: 0, del: 0, oth: 0, cats: new Map(), debt: 0 };
+  const m = { paid: sx.got, materials: sx.mat, delivery: sx.del, other: sx.oth, spent: sx.spent };
+  const role = cpRole(name);
+  const [pFrom, pTo] = cpPeriod(period);
   const objs = memo('clients').rows.filter(r => norm(r.v[0]) === n);
   const reqs = (S.data.requests || []).filter(r => norm(r.client) === n).sort((a, b) => b.id - a.id);
-  const ops = S.data.opsDesc.filter(o => norm(o.cp) === n || norm(o.client) === n);
-  const debts = (S.data.debts || []).filter(d => norm(d.who) === n && d.left > 0);
+  const ops = S.data.opsDesc.filter(o => (norm(o.cp) === n || norm(o.client) === n) && (!pFrom || (o.date >= pFrom && o.date <= pTo)));
   const margin = m.paid - m.spent;
   let h = '<h3>' + esc(name) + '<button class="x" data-close>×</button></h3>';
-  h += '<div class="grid2" style="margin-top:0"><div class="card kpi"><div class="label">Получено</div><div class="value num">' + money(m.paid) + '</div></div>' +
+  const PER = { all: 'всё время', month: 'этот месяц', prev: 'прошлый месяц', year: 'этот год' };
+  h += '<div class="chips">' + Object.keys(PER).map(k => '<button class="chip ' + (period === k ? 'on' : '') + '" data-pper="' + k + '">' + PER[k].charAt(0).toUpperCase() + PER[k].slice(1) + '</button>').join('') + '</div>';
+  if (role) h += '<div class="hint" style="margin:0 2px 10px">' + esc(role) + '</div>';
+  const isClient = role === 'Клиент' || m.paid > 0 || m.spent > 0;
+  if (sx.paid > 0 || !isClient) {
+    // сколько ему заплатили — «кто сколько заработал»
+    const cats = [...sx.cats.entries()].sort((a, b) => b[1] - a[1]);
+    h += '<div class="card kpi" style="margin-bottom:10px"><div class="label">Мы заплатили</div><div class="value num">' + money(sx.paid) + '</div>' +
+      (cats.length ? '<dl class="kv" style="margin-top:6px">' + cats.map(([c, v]) => '<dt>' + esc(c) + '</dt><dd class="num">' + money(v) + '</dd>').join('') + '</dl>' : '<div class="sub">за ' + PER[period] + ' платежей нет</div>') + '</div>';
+  }
+  if (sx.debt > 0) h += '<div class="banner">💸 Должен нам ' + money(sx.debt) + '</div>';
+  if (isClient) h += '<div class="grid2" style="margin-top:0"><div class="card kpi"><div class="label">Получено</div><div class="value num">' + money(m.paid) + '</div></div>' +
     '<div class="card kpi"><div class="label">Маржа</div><div class="value num ' + (margin < 0 ? 'neg' : 'pos') + '">' + money(margin) + '</div><div class="sub">' + (m.paid ? Math.round(margin / m.paid * 100) + '% от оплат' : '') + '</div></div></div>';
-  h += '<div class="card" style="margin-top:10px"><dl class="kv"><dt>Материалы</dt><dd class="num">' + money(m.materials) + '</dd><dt>Доставка</dt><dd class="num">' + money(m.delivery) + '</dd><dt>Прочее</dt><dd class="num">' + money(m.other) + '</dd><dt>Всего расходов</dt><dd class="num">' + money(m.spent) + '</dd></dl>' +
+  if (isClient) h += '<div class="card" style="margin-top:10px"><dl class="kv"><dt>Материалы</dt><dd class="num">' + money(m.materials) + '</dd><dt>Доставка</dt><dd class="num">' + money(m.delivery) + '</dd><dt>Прочее</dt><dd class="num">' + money(m.other) + '</dd><dt>Всего расходов</dt><dd class="num">' + money(m.spent) + '</dd></dl>' +
     (m.paid ? '<div class="pbar"><i style="width:' + Math.min(100, Math.round(m.spent / m.paid * 100)) + '%"></i></div>' : '') + '</div>';
-  if (debts.length) h += '<div class="banner">💸 Должен ' + money(debts.reduce((s, d) => s + d.left, 0)) + '</div>';
-  h += '<div class="section-title"><h2>Объекты и контакты</h2><button id="c-add">+ Объект</button></div>';
-  h += objs.length ? objs.map(r => '<div class="card" data-obj="' + r.row + '"><b>' + esc(r.v[objCol()] || 'Объект без названия') + '</b><div style="height:6px"></div>' + contactHtml(memo('clients').headers, r.v, [0, objCol()]) + '</div>').join('') : '<div class="list"><div class="empty">Контактов в памятке нет</div></div>';
-  h += '<div class="section-title"><h2>Заявки</h2><button id="c-req">+ Заявка</button></div>';
-  h += reqs.length ? '<div class="list">' + reqs.slice(0, 10).map(reqRow).join('') + '</div>' : '<div class="list"><div class="empty">Заявок нет</div></div>';
+  if (isClient) h += '<div class="section-title"><h2>Объекты и контакты</h2><button id="c-add">+ Объект</button></div>' + (objs.length ? objs.map(r => '<div class="card" data-obj="' + r.row + '"><b>' + esc(r.v[objCol()] || 'Объект без названия') + '</b><div style="height:6px"></div>' + contactHtml(memo('clients').headers, r.v, [0, objCol()]) + '</div>').join('') : '<div class="list"><div class="empty">Контактов в памятке нет</div></div>');
+  if (isClient) h += '<div class="section-title"><h2>Заявки</h2><button id="c-req">+ Заявка</button></div>' +
+    (reqs.length ? '<div class="list">' + reqs.slice(0, 10).map(reqRow).join('') + '</div>' : '<div class="list"><div class="empty">Заявок нет</div></div>');
   h += '<div class="section-title"><h2>Операции (' + ops.length + ')</h2></div>';
   h += ops.length ? '<div class="list">' + ops.slice(0, 30).map(opRow).join('') + (ops.length > 30 ? '<button class="more" id="c-all">Все операции в «Деньгах»</button>' : '') + '</div>' : '<div class="list"><div class="empty">Операций нет</div></div>';
   openSheet(h, sh => {
+    sh.querySelectorAll('[data-pper]').forEach(b => b.onclick = () => { closeSheet(true); clientPage(name, b.dataset.pper); });
     sh.querySelectorAll('[data-op]').forEach(el => el.onclick = () => { closeSheet(); setTimeout(() => opDetail(+el.dataset.op), 260); });
     sh.querySelectorAll('[data-reqid]').forEach(el => el.onclick = () => { closeSheet(); setTimeout(() => reqDetail(+el.dataset.reqid), 260); });
     sh.querySelectorAll('[data-obj]').forEach(el => el.onclick = () => { const r = objs.find(x => x.row === +el.dataset.obj); closeSheet(); setTimeout(() => formContact('clients', r), 260); });
-    $('#c-add', sh).onclick = () => { closeSheet(); setTimeout(() => formContact('clients', null, name), 260); };
-    $('#c-req', sh).onclick = () => { closeSheet(); setTimeout(() => formRequest({ client: name }), 260); };
+    const ca = $('#c-add', sh); if (ca) ca.onclick = () => { closeSheet(); setTimeout(() => formContact('clients', null, name), 260); };
+    const cr = $('#c-req', sh); if (cr) cr.onclick = () => { closeSheet(); setTimeout(() => formRequest({ client: name }), 260); };
     const all = $('#c-all', sh); if (all) all.onclick = () => { closeSheet(); Object.assign(S.money, { q: name, type: 'all', acc: '', month: '', errors: false }); go('money'); };
   });
 }
