@@ -1,0 +1,16 @@
+{
+  "name": "SpaceKit — деньги",
+  "short_name": "SpaceKit",
+  "description": "Отчёт по деньгам SpaceKit: балансы, операции, контрагенты",
+  "start_url": "../",
+  "scope": "../",
+  "display": "standalone",
+  "background_color": "#E3DFD6",
+  "theme_color": "#E3DFD6",
+  "lang": "ru",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
