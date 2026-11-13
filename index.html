@@ -435,6 +435,38 @@ img { transition: opacity .3s ease; }
   html { scroll-behavior: auto; }
   ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
 }
+
+/* ---------- анимации иконок меню ---------- */
+.nav .pill { position: relative; overflow: visible; }
+.nav .pill svg { transform-origin: 50% 80%; }
+/* Деньги: три купюры веером выезжают вверх и возвращаются */
+.bills { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.bills i { position: absolute; left: -9px; top: -6px; width: 18px; height: 11px; border-radius: 2.5px; opacity: 0;
+  background: linear-gradient(135deg, #4CC07D, #2E9A5C); box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .55) inset, 0 2px 6px rgba(0, 0, 0, .18); }
+.bills i::after { content: ''; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; border: 1.3px solid rgba(255, 255, 255, .8); }
+.pill-money.play .bills i:nth-child(1) { animation: billL .9s cubic-bezier(.3, 1.3, .5, 1) both; }
+.pill-money.play .bills i:nth-child(2) { animation: billC .9s cubic-bezier(.3, 1.3, .5, 1) .05s both; }
+.pill-money.play .bills i:nth-child(3) { animation: billR .9s cubic-bezier(.3, 1.3, .5, 1) .1s both; }
+.pill-money.play svg { animation: walletDip .9s ease both; }
+@keyframes billL { 0% { opacity: 0; transform: none; } 15% { opacity: 1; } 45% { opacity: 1; transform: translate(-13px, -19px) rotate(-22deg); } 70% { opacity: 1; transform: translate(-11px, -17px) rotate(-18deg); } 100% { opacity: 0; transform: none; } }
+@keyframes billC { 0% { opacity: 0; transform: none; } 15% { opacity: 1; } 45% { opacity: 1; transform: translate(0, -24px); } 70% { opacity: 1; transform: translate(0, -21px); } 100% { opacity: 0; transform: none; } }
+@keyframes billR { 0% { opacity: 0; transform: none; } 15% { opacity: 1; } 45% { opacity: 1; transform: translate(13px, -19px) rotate(22deg); } 70% { opacity: 1; transform: translate(11px, -17px) rotate(18deg); } 100% { opacity: 0; transform: none; } }
+@keyframes walletDip { 0%, 100% { transform: none; } 20% { transform: translateY(2px) scale(1.06, .92); } 50% { transform: translateY(-1px); } }
+/* Главная: домик подпрыгивает */
+.pill-home.play svg { animation: hop .6s cubic-bezier(.3, 1.5, .5, 1) both; }
+@keyframes hop { 0% { transform: none; } 25% { transform: scale(1.12, .85); } 55% { transform: translateY(-7px) scale(.95, 1.08); } 80% { transform: scale(1.05, .95); } 100% { transform: none; } }
+/* Клиенты: человечки машут */
+.pill-cli.play svg { animation: wave .7s ease both; }
+@keyframes wave { 0%, 100% { transform: none; } 20% { transform: rotate(-12deg) scale(1.1); } 45% { transform: rotate(10deg) scale(1.1); } 70% { transform: rotate(-5deg); } }
+/* Долги: листок переворачивается */
+.pill-debt.play svg { animation: flip .7s cubic-bezier(.3, 1.2, .5, 1) both; transform-origin: 50% 50%; }
+@keyframes flip { 0% { transform: perspective(60px) rotateY(0); } 60% { transform: perspective(60px) rotateY(200deg); } 100% { transform: perspective(60px) rotateY(360deg); } }
+/* Кнопка «+» поворачивается, кнопка отчёта — столбики пульсируют */
+.fab svg { transition: transform .3s cubic-bezier(.3, 1.4, .5, 1); }
+.fab:active svg { transform: rotate(90deg); }
+.rp-open-btn:active svg { animation: bars .5s ease both; transform-origin: 50% 100%; }
+@keyframes bars { 0%, 100% { transform: none; } 40% { transform: scaleY(.6); } 70% { transform: scaleY(1.12); } }
+@media (prefers-reduced-motion: reduce) { .bills { display: none; } }
 </style>
 <script>
 (function () {
@@ -700,7 +732,7 @@ function shell(inner, fab) {
   return '<div class="main">' + inner + '</div>' +
     (fab ? '<button class="fab" id="fab" aria-label="Добавить">' + ICONS.plus + '</button>' : '') +
     '<nav class="nav"><div class="nav-inner">' + NAV.map(([k, t]) =>
-      '<button data-nav="' + k + '" class="' + (S.view === k ? 'on' : '') + '"><span class="pill">' + ICONS[k] + '</span>' + t + '</button>').join('') +
+      '<button data-nav="' + k + '" class="' + (S.view === k ? 'on' : '') + '"><span class="pill pill-' + k + '">' + (k === 'money' ? '<span class="bills"><i></i><i></i><i></i></span>' : '') + ICONS[k] + '</span>' + t + '</button>').join('') +
     '</div></nav>';
 }
 function topbar(title, extra) {
@@ -723,6 +755,15 @@ function go(view) {
   const changed = S.view !== view;
   S.view = view; window.scrollTo(0, 0); render(); haptic();
   const m = changed && $('.main'); if (m) m.classList.add('enter');
+  playIcon(view);
+}
+// Короткая анимация иконки в нижнем меню: купюры выезжают, домик подпрыгивает и т. д.
+function playIcon(view) {
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pill = !reduce && document.querySelector('.nav [data-nav="' + view + '"] .pill');
+  if (!pill) return;
+  pill.classList.remove('play'); void pill.offsetWidth; pill.classList.add('play');
+  setTimeout(() => pill.classList.remove('play'), 1000);
 }
 function rerender() {
   S.keepScroll = true;
