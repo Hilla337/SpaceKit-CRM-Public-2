@@ -335,27 +335,28 @@ a { color: var(--orange-strong); }
 /* ===== тёмная тема ===== */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0F1115; --surface: #181B21; --surface-2: #1F232A; --line: #2A2F38;
-  --text: #ECEEF2; --muted: #9098A5; --beige-deep: #262A32;
+  --bg: #000000; --surface: #111113; --surface-2: #1C1C1F; --line: #232327;
+  --text: #F2F2F4; --muted: #8E8E96; --beige-deep: #1C1C1F;
   --orange: #F07A2E; --orange-strong: #FF9450; --orange-soft: #3A2416;
   --green: #3DBA74; --green-soft: #15291D; --red: #F0675A; --red-soft: #3A1B18;
   --amber: #E0A63C; --amber-soft: #33270F;
-  --blue: #6B7480; --blue-strong: #ECEEF2; --blue-soft: #232831; --blue-softer: #232831;
+  --blue: #6B6B74; --blue-strong: #F2F2F4; --blue-soft: #1C1C1F; --blue-softer: #1C1C1F;
+  --shadow: none;
 }
-:root[data-theme="dark"] .nav { background: rgba(20, 22, 27, .95); border-top-color: var(--line); }
+:root[data-theme="dark"] .nav { background: rgba(0, 0, 0, .86); border-top-color: var(--line); -webkit-backdrop-filter: saturate(160%) blur(18px); backdrop-filter: saturate(160%) blur(18px); }
 :root[data-theme="dark"] .home-logo, :root[data-theme="dark"] .logo, :root[data-theme="dark"] .boot-logo { filter: invert(1) hue-rotate(180deg); }
 :root[data-theme="dark"] .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
-:root[data-theme="dark"] .seg { background: #0B0D10; }
+:root[data-theme="dark"] .seg { background: #111113; }
 :root[data-theme="dark"] .seg button.on { background: var(--surface-2); }
 :root[data-theme="dark"] .banner { color: var(--amber); }
 :root[data-theme="dark"] .banner.ok { color: var(--green); }
 :root[data-theme="dark"] .tag.warn, :root[data-theme="dark"] .tag.s-way { color: var(--amber); }
 :root[data-theme="dark"] .tag.s-bought { background: #2A2238; color: #B79BE0; }
-:root[data-theme="dark"] .tag.s-cancel { background: #262A32; color: var(--muted); }
+:root[data-theme="dark"] .tag.s-cancel { background: #1C1C1F; color: var(--muted); }
 :root[data-theme="dark"] .ico.mv, :root[data-theme="dark"] .ico.neutral { color: var(--muted); }
-:root[data-theme="dark"] .overlay { background: rgba(0, 0, 0, .6); }
+:root[data-theme="dark"] .overlay { background: rgba(0, 0, 0, .7); }
 :root[data-theme="dark"] .toast { background: #ECEEF2; color: #0F1115; }
-:root[data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1F232A, #2A2F38, #1F232A); background-size: 200% 100%; }
+:root[data-theme="dark"] .skeleton { background: linear-gradient(90deg, #141416, #222226, #141416); background-size: 200% 100%; }
 :root[data-theme="dark"] .seg button { color: var(--muted); }
 :root[data-theme="dark"] .seg button.on { color: var(--text); }
 :root[data-theme="dark"] .rp-out { opacity: 1; }
@@ -387,6 +388,53 @@ body { touch-action: manipulation; -webkit-font-smoothing: antialiased; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- плавность, часть 2 ---------- */
+html { scroll-behavior: smooth; }
+body { transition: background-color .35s ease, color .35s ease; }
+/* запасной путь смены темы (без View Transitions): все цвета плавно перетекают */
+html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+  transition: background-color .4s ease, color .4s ease, border-color .4s ease, fill .4s ease, stroke .4s ease, box-shadow .4s ease !important;
+}
+/* View Transitions: смена темы и вкладок — мягкое перетекание */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .26s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+html.vt-theme::view-transition-old(root), html.vt-theme::view-transition-new(root) { animation-duration: .45s; animation-timing-function: ease; }
+.nav { view-transition-name: nav; }
+::view-transition-group(nav) { animation: none; }
+/* при входе на экран строки и карточки появляются лесенкой */
+.main.enter .card, .main.enter .list, .main.enter .totals, .main.enter .chips, .main.enter .seg, .main.enter .banner, .main.enter .grid2 {
+  animation: rise .34s cubic-bezier(.2, .8, .2, 1) both;
+}
+.main.enter > :nth-child(2) { animation-delay: .03s; } .main.enter > :nth-child(3) { animation-delay: .06s; }
+.main.enter > :nth-child(4) { animation-delay: .09s; } .main.enter > :nth-child(5) { animation-delay: .12s; }
+.main.enter > :nth-child(n+6) { animation-delay: .15s; }
+.main.enter .list .row:nth-child(-n+14) { animation: rowIn .32s cubic-bezier(.2, .8, .2, 1) both; }
+.main.enter .list .row:nth-child(2) { animation-delay: .04s; } .main.enter .list .row:nth-child(3) { animation-delay: .07s; }
+.main.enter .list .row:nth-child(4) { animation-delay: .1s; } .main.enter .list .row:nth-child(5) { animation-delay: .13s; }
+.main.enter .list .row:nth-child(n+6):nth-child(-n+14) { animation-delay: .16s; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rowIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+/* содержимое шторки проявляется вслед за ней */
+.sheet.show > * { animation: rise .32s cubic-bezier(.2, .8, .2, 1) both; animation-delay: .06s; }
+.sheet.show > .grab, .sheet.show > h3 { animation-delay: 0s; }
+/* подсказки, ошибки, баннеры */
+.sugg { animation: pop .16s cubic-bezier(.2, .8, .2, 1) both; transform-origin: top center; }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+#f-err:not(:empty), .err:not(:empty) { animation: shake .3s ease both; }
+@keyframes shake { 0%, 100% { transform: none; } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.field input, .field select, .field textarea { transition: border-color .18s ease, box-shadow .2s ease, background-color .3s ease; }
+.seg button { transition: background-color .22s ease, color .22s ease, box-shadow .22s ease, transform .16s cubic-bezier(.2, .8, .2, 1); }
+.theme-btn svg { transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
+.theme-btn:active svg { transform: rotate(-40deg) scale(.9); }
+.icon-btn { transition: background-color .18s ease, transform .16s cubic-bezier(.2, .8, .2, 1); }
+.icon-btn:active { transform: scale(.92); }
+img { transition: opacity .3s ease; }
+.boot-logo, .home-logo, .logo { transition: filter .4s ease, opacity .3s ease; }
+.amt, .num { transition: color .3s ease; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+}
 </style>
 <script>
 (function () {
@@ -395,7 +443,7 @@ body { touch-action: manipulation; -webkit-font-smoothing: antialiased; }
   var sys = (tg && tg.colorScheme) ? tg.colorScheme === 'dark' : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
   var dark = m === 'dark' || (m === 'auto' && sys);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  var mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.setAttribute('content', dark ? '#0F1115' : '#F4F5F7');
+  var mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.setAttribute('content', dark ? '#000000' : '#F4F5F7');
 })();
 </script>
 </head>
@@ -678,7 +726,18 @@ function go(view) {
   S.view = view; window.scrollTo(0, 0); render(); haptic();
   const m = changed && $('.main'); if (m) m.classList.add('enter');
 }
-function rerender() { S.keepScroll = true; render(); }
+function rerender() {
+  S.keepScroll = true;
+  const recentTap = Date.now() - lastTap < 400;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (recentTap && !reduce && document.startViewTransition && !sheetEl) {
+    lastTap = 0;
+    document.startViewTransition(() => { S.keepScroll = true; render(); });
+  } else render();
+}
+// время последнего нажатия: по нему понимаем, что экран меняется от действия пользователя, а не от набора текста
+let lastTap = 0;
+document.addEventListener('click', e => { if (!e.target.closest('input, textarea, select')) lastTap = Date.now(); }, true);
 
 function bindCommon() {
   document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => go(b.dataset.nav));
@@ -764,16 +823,32 @@ function applyTheme() {
   const sys = (tg && tg.colorScheme) ? tg.colorScheme === 'dark' : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
   const dark = m === 'dark' || (m === 'auto' && sys);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  const bg = dark ? '#0F1115' : '#F4F5F7';
+  const bg = dark ? '#000000' : '#F4F5F7';
   const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.setAttribute('content', bg);
-  try { if (tg && tg.setHeaderColor) { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); if (tg.setBottomBarColor) tg.setBottomBarColor(dark ? '#181B21' : '#FFFFFF'); } } catch (e) {}
+  try { if (tg && tg.setHeaderColor) { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); if (tg.setBottomBarColor) tg.setBottomBarColor(dark ? '#000000' : '#FFFFFF'); } } catch (e) {}
 }
 function cycleTheme() {
   const order = ['auto', 'light', 'dark'], next = order[(order.indexOf(themeMode()) + 1) % 3];
   try { localStorage.setItem('sk-crm-theme', next); } catch (e) {}
-  applyTheme(); toast(THEME_NAMES[next]); rerender();
+  smoothTheme(() => { applyTheme(); render(); });
+  toast(THEME_NAMES[next]);
 }
-try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch (e) {}
+// Тема меняется мягко: страница перетекает из старых цветов в новые за ~0,45 с
+function smoothTheme(change) {
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { change(); return; }
+  if (document.startViewTransition) {
+    document.documentElement.classList.add('vt-theme');
+    const t = document.startViewTransition(() => { S.keepScroll = true; change(); });
+    t.finished.finally(() => document.documentElement.classList.remove('vt-theme'));
+    return;
+  }
+  const html = document.documentElement;
+  html.classList.add('theme-anim');
+  S.keepScroll = true; change();
+  setTimeout(() => html.classList.remove('theme-anim'), 500);
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themeMode() === 'auto') smoothTheme(() => { applyTheme(); render(); }); }); } catch (e) {}
 try { window.Telegram && Telegram.WebApp && Telegram.WebApp.onEvent && Telegram.WebApp.onEvent('themeChanged', applyTheme); } catch (e) {}
 
 // ---------- ПОДСКАЗКИ ----------
