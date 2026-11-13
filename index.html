@@ -604,6 +604,10 @@ html.app-in .fab { animation: fabIn .8s cubic-bezier(.3, 1.35, .5, 1) .45s both;
 :root[data-theme="beige"] .pill-cli .p1 circle, :root[data-theme="beige"] .pill-cli .p1 path,
 :root[data-theme="beige"] .pill-money svg rect, :root[data-theme="beige"] .bills i { fill: #E8E4DC; background: #E8E4DC; }
 :root[data-theme="beige"] .spl-glow { background: radial-gradient(circle, rgba(217, 101, 28, .16), rgba(217, 101, 28, .05) 45%, rgba(217, 101, 28, 0) 68%); }
+
+/* ---------- правка записи ---------- */
+.field .changed { border-color: var(--orange) !important; box-shadow: 0 0 0 3px var(--orange-soft); }
+#d-edit { display: flex; align-items: center; justify-content: center; }
 </style>
 <script>
 (function () {
@@ -729,6 +733,7 @@ const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').trim();
 const haptic = t => { try { tg && tg.HapticFeedback && (t === 'ok' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred('light')); } catch (e) {} };
 
 const ICONS = {
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;margin-right:7px;vertical-align:-3px"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>',
   money: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>',
   cli: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="p2"><g class="p2-in"><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></g></g><g class="p1"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/></g></svg>',
@@ -1411,11 +1416,15 @@ function opDetail(row) {
   kv.forEach(([k, v]) => { if (v) h += '<dt>' + k + '</dt><dd>' + esc(v) + '</dd>'; });
   h += '</dl><div style="height:16px"></div>';
   if (o.cp) h += '<button class="btn ghost" id="d-cp">Все операции: ' + esc(o.cp) + '</button>';
+  const canEdit = S.user.role === 'owner' || myAccounts().includes(o.acc);
+  if (canEdit) h += '<button class="btn" id="d-edit">' + ICONS.edit + 'Изменить</button>';
   h += '<button class="btn ghost" id="d-copy">Повторить запись</button>';
   if (S.user.role === 'owner') h += '<button class="btn danger" id="d-del">Удалить строку из таблицы</button>';
   openSheet(h, sh => {
     const cp = $('#d-cp', sh); if (cp) cp.onclick = () => { closeSheet(); Object.assign(S.money, { q: o.cp, type: 'all', acc: '', month: '', errors: false }); go('money'); };
     $('#d-copy', sh).onclick = () => { closeSheet(); setTimeout(() => formOp({ type: o.type, acc: o.acc, to: o.to, cat: o.cat, cp: o.cp, client: o.client, comment: o.comment }), 260); };
+    const ed = $('#d-edit', sh);
+    if (ed) ed.onclick = () => { closeSheet(); setTimeout(() => formOp({ type: o.type, amount: String(o.amount), acc: o.acc, to: o.to, date: o.date, cat: o.cat, cp: o.cp, client: o.client, comment: o.comment }, o), 300); };
     const del = $('#d-del', sh);
     if (del) del.onclick = async () => {
       if (!(await confirmBox('Удалить строку №' + o.row + ' (' + sign + money(o.amount) + ', ' + (o.cp || o.cat || o.type) + ') из таблицы?'))) return;
@@ -1429,7 +1438,8 @@ function opDetail(row) {
 // ---------- форма операции ----------
 let lastAcc = '';
 try { lastAcc = localStorage.getItem('sk-acc') || ''; } catch (e) {}
-function formOp(pre = {}) {
+// edit — исходная операция: форма открывается заполненной и перезаписывает ту же строку
+function formOp(pre = {}, edit = null) {
   const accs = accounts();
   const mine = myAccounts();
   const defAcc = pre.acc || (lastAcc && accs.includes(lastAcc) ? lastAcc : mine[0] || accs[0]);
@@ -1438,7 +1448,7 @@ function formOp(pre = {}) {
   const catsFor = t => t === 'Приход' ? S.data.refs.income : t === 'Расход' ? S.data.refs.expense : ['ПО (выдано под отчёт)'];
   const draw = () => {
     const t = st.type;
-    let h = '<h3>Новая операция<button class="x" data-close>×</button></h3>';
+    let h = '<h3>' + (edit ? 'Изменить запись · строка ' + edit.row : 'Новая операция') + '<button class="x" data-close>×</button></h3>';
     h += '<div class="seg">' + ['Расход', 'Приход', 'Перевод'].map(x => '<button data-t="' + x + '" class="' + (t === x ? 'on' : '') + '">' + x + '</button>').join('') + '</div>';
     h += '<div class="field"><label>Сумма, ₽</label><input class="amount num" id="f-amount" inputmode="decimal" placeholder="0" value="' + esc(pre.amount || '') + '"></div>';
     h += '<div class="two"><div class="field"><label>' + (t === 'Перевод' ? 'Откуда' : 'Счёт') + '</label><select id="f-acc">' + opts(accs, $('#f-acc') ? $('#f-acc').value : defAcc) + '</select></div>';
@@ -1453,7 +1463,7 @@ function formOp(pre = {}) {
     }
     h += '<div class="field"><label>Комментарий</label><input id="f-comment" value="' + esc(pre.comment || '') + '" placeholder="Объект, за что"></div>';
     if (t === 'Перевод') h += '<div class="hint">Перевод — деньги переходят между кассами (ПО, снятие с ИП). Баланс компании не меняется. Клиента у переводов не указываем.</div>';
-    h += '<div class="err" id="f-err"></div><button class="btn" id="f-save">Записать в таблицу</button>';
+    h += '<div class="err" id="f-err"></div><button class="btn" id="f-save">' + (edit ? 'Сохранить изменения' : 'Записать в таблицу') + '</button>';
     h += '<datalist id="dl-names">' + refNames().sort((a, b) => a.localeCompare(b, 'ru')).map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
     h += '<datalist id="dl-clients">' + refNames().sort((a, b) => (cpRole(a) === 'Клиент' ? 0 : 1) - (cpRole(b) === 'Клиент' ? 0 : 1) || a.localeCompare(b, 'ru')).map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
     return h;
@@ -1466,6 +1476,12 @@ function formOp(pre = {}) {
     });
     const amount = $('#f-amount', sh);
     if (!pre.amount) setTimeout(() => amount.focus(), 280);
+    // в режиме правки подсвечиваем изменённые поля
+    if (edit) sh.querySelectorAll('.field input, .field select').forEach(el => {
+      const k = el.id.replace('f-', ''), orig = String(k === 'amount' ? edit.amount : (edit[k] || ''));
+      const mark = () => el.classList.toggle('changed', el.value.trim() !== orig && !(k === 'amount' && Number(el.value.replace(/\s/g, '').replace(',', '.')) === Number(orig)));
+      el.addEventListener('input', mark); el.addEventListener('change', mark);
+    });
     amount.oninput = () => { const v = amount.value.replace(/[^\d.,\s]/g, ''); if (v !== amount.value) amount.value = v; };
     $('#f-save', sh).onclick = async () => {
       const err = $('#f-err', sh);
@@ -1491,7 +1507,14 @@ function formOp(pre = {}) {
         }
       }
       err.textContent = '';
-      const btn = $('#f-save', sh); btn.disabled = true; btn.textContent = 'Записываю…';
+      const btn = $('#f-save', sh); btn.disabled = true; btn.textContent = edit ? 'Сохраняю…' : 'Записываю…';
+      if (edit) {
+        try {
+          await action('editOp', { row: edit.row, date: edit.date, amount: edit.amount, acc: edit.acc, op });
+          haptic('ok'); toast('Строка ' + edit.row + ' изменена'); closeSheet(); await load(true);
+        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Сохранить изменения'; }
+        return;
+      }
       try {
         const r = await action('addOp', { op });
         try { localStorage.setItem('sk-acc', op.acc); lastAcc = op.acc; } catch (e) {}
