@@ -439,19 +439,38 @@ img { transition: opacity .3s ease; }
 /* ---------- анимации иконок меню ---------- */
 .nav .pill { position: relative; overflow: visible; }
 .nav .pill svg { transform-origin: 50% 80%; }
-/* Деньги: три купюры веером выезжают вверх и возвращаются */
-.bills { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
-.bills i { position: absolute; left: -9px; top: -6px; width: 18px; height: 11px; border-radius: 2.5px; opacity: 0;
-  background: linear-gradient(135deg, #4CC07D, #2E9A5C); box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .55) inset, 0 2px 6px rgba(0, 0, 0, .18); }
-.bills i::after { content: ''; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; border: 1.3px solid rgba(255, 255, 255, .8); }
-.pill-money.play .bills i:nth-child(1) { animation: billL .9s cubic-bezier(.3, 1.3, .5, 1) both; }
-.pill-money.play .bills i:nth-child(2) { animation: billC .9s cubic-bezier(.3, 1.3, .5, 1) .05s both; }
-.pill-money.play .bills i:nth-child(3) { animation: billR .9s cubic-bezier(.3, 1.3, .5, 1) .1s both; }
-.pill-money.play svg { animation: walletDip .9s ease both; }
-@keyframes billL { 0% { opacity: 0; transform: none; } 15% { opacity: 1; } 45% { opacity: 1; transform: translate(-13px, -19px) rotate(-22deg); } 70% { opacity: 1; transform: translate(-11px, -17px) rotate(-18deg); } 100% { opacity: 0; transform: none; } }
-@keyframes billC { 0% { opacity: 0; transform: none; } 15% { opacity: 1; } 45% { opacity: 1; transform: translate(0, -24px); } 70% { opacity: 1; transform: translate(0, -21px); } 100% { opacity: 0; transform: none; } }
-@keyframes billR { 0% { opacity: 0; transform: none; } 15% { opacity: 1; } 45% { opacity: 1; transform: translate(13px, -19px) rotate(22deg); } 70% { opacity: 1; transform: translate(11px, -17px) rotate(18deg); } 100% { opacity: 0; transform: none; } }
-@keyframes walletDip { 0%, 100% { transform: none; } 20% { transform: translateY(2px) scale(1.06, .92); } 50% { transform: translateY(-1px); } }
+/* Деньги: из-за купюры выезжают ещё две — вверх и вниз, быстро дрожат и плавно прячутся обратно */
+.pill-money svg { position: relative; z-index: 1; }
+.bills { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 0; }
+.bills i { position: absolute; left: -10px; top: -7px; width: 20px; height: 14px; border-radius: 3px; opacity: 0;
+  border: 1.8px solid currentColor; background: var(--bg); }
+.bills i::after { content: ''; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; border: 1.5px solid currentColor; }
+.pill-money.play .bills i:nth-child(1) { animation: billUp 1.1s both; }
+.pill-money.play .bills i:nth-child(2) { animation: billDown 1.1s both; }
+.pill-money.play svg { animation: billMain 1.1s both; }
+@keyframes billUp {
+  0% { opacity: 0; transform: none; animation-timing-function: cubic-bezier(.2, .9, .3, 1.2); }
+  10% { opacity: 1; }
+  24% { transform: translate(0, -11px) rotate(-3deg); animation-timing-function: ease-in-out; }
+  33% { transform: translate(-1.5px, -11px) rotate(6deg); }
+  42% { transform: translate(1.5px, -11px) rotate(-6deg); }
+  51% { transform: translate(-1px, -11px) rotate(5deg); }
+  60% { transform: translate(1px, -11px) rotate(-3deg); }
+  70% { transform: translate(0, -11px) rotate(0); opacity: 1; animation-timing-function: cubic-bezier(.5, 0, .3, 1); }
+  100% { transform: none; opacity: 0; }
+}
+@keyframes billDown {
+  0% { opacity: 0; transform: none; animation-timing-function: cubic-bezier(.2, .9, .3, 1.2); }
+  10% { opacity: 1; }
+  24% { transform: translate(0, 11px) rotate(3deg); animation-timing-function: ease-in-out; }
+  33% { transform: translate(1.5px, 11px) rotate(-6deg); }
+  42% { transform: translate(-1.5px, 11px) rotate(6deg); }
+  51% { transform: translate(1px, 11px) rotate(-5deg); }
+  60% { transform: translate(-1px, 11px) rotate(3deg); }
+  70% { transform: translate(0, 11px) rotate(0); opacity: 1; animation-timing-function: cubic-bezier(.5, 0, .3, 1); }
+  100% { transform: none; opacity: 0; }
+}
+@keyframes billMain { 0%, 100% { transform: none; } 24% { transform: scale(1.08); } 33% { transform: scale(1.08) rotate(-3deg); } 42% { transform: scale(1.08) rotate(3deg); } 51% { transform: scale(1.06) rotate(-2deg); } 70% { transform: scale(1.04); } }
 /* Главная: домик подпрыгивает */
 .pill-home.play svg { animation: hop .6s cubic-bezier(.3, 1.5, .5, 1) both; }
 @keyframes hop { 0% { transform: none; } 25% { transform: scale(1.12, .85); } 55% { transform: translateY(-7px) scale(.95, 1.08); } 80% { transform: scale(1.05, .95); } 100% { transform: none; } }
@@ -520,7 +539,7 @@ const S = {
   user: null, data: null, loading: false, loadedAt: 0,
   view: 'home',
   money: { type: 'all', acc: '', month: '', q: '', errors: false, limit: 80 },
-  cli: { tab: 'all', q: '', role: '', period: 'all' },
+  cli: { tab: 'clients', q: '' },
   debt: { tab: 'debts', period: 'month' },
   report: { preset: 'month', from: '', to: '', acc: '', open: '' },
 };
@@ -695,6 +714,7 @@ const cpRole = name => { const c = (S.data && S.data.refs.contractors || []).fin
 // Отчёт по каждому контрагенту за период: сколько мы им заплатили, сколько от них получили,
 // сколько потратили на заказы клиента (материалы, доставка, прочее) и его долг по листу ДОЛГИ.
 function cpPeriod(p) {
+  if (p && typeof p === 'object') return [p.from, p.to];
   const t = todayISO(), y = t.slice(0, 4), m = t.slice(0, 7);
   if (p === 'month') return [m + '-01', t];
   if (p === 'prev') { const d = new Date(Date.UTC(+y, +m.slice(5) - 2, 1)); const pm = d.toISOString().slice(0, 7); return [pm + '-01', pm + '-31']; }
@@ -702,12 +722,13 @@ function cpPeriod(p) {
   return ['', ''];
 }
 function cpStatsAll(period) {
-  const [from, to] = cpPeriod(period);
+  const [from, to] = cpPeriod(period), accF = period && typeof period === 'object' ? period.acc : '';
   const map = new Map();
   const get = name => { const k = cpNorm(name); let x = map.get(k); if (!x) { x = { name, paid: 0, got: 0, spent: 0, mat: 0, del: 0, oth: 0, n: 0, last: '', cats: new Map() }; map.set(k, x); } return x; };
   (S.data.ops || []).forEach(o => {
     if (o.type === 'Перевод' || !o.date) return;
     if (from && (o.date < from || o.date > to)) return;
+    if (accF && o.acc !== accF) return;
     const touch = (x) => { x.n++; if (o.date > x.last) x.last = o.date; };
     if (o.type === 'Расход' && o.cp) { const x = get(o.cp); x.paid += o.amount; x.cats.set(o.cat || '—', (x.cats.get(o.cat || '—') || 0) + o.amount); touch(x); }
     if (o.type === 'Приход') {
@@ -732,7 +753,7 @@ function shell(inner, fab) {
   return '<div class="main">' + inner + '</div>' +
     (fab ? '<button class="fab" id="fab" aria-label="Добавить">' + ICONS.plus + '</button>' : '') +
     '<nav class="nav"><div class="nav-inner">' + NAV.map(([k, t]) =>
-      '<button data-nav="' + k + '" class="' + (S.view === k ? 'on' : '') + '"><span class="pill pill-' + k + '">' + (k === 'money' ? '<span class="bills"><i></i><i></i><i></i></span>' : '') + ICONS[k] + '</span>' + t + '</button>').join('') +
+      '<button data-nav="' + k + '" class="' + (S.view === k ? 'on' : '') + '"><span class="pill pill-' + k + '">' + (k === 'money' ? '<span class="bills"><i></i><i></i></span>' : '') + ICONS[k] + '</span>' + t + '</button>').join('') +
     '</div></nav>';
 }
 function topbar(title, extra) {
@@ -763,7 +784,7 @@ function playIcon(view) {
   const pill = !reduce && document.querySelector('.nav [data-nav="' + view + '"] .pill');
   if (!pill) return;
   pill.classList.remove('play'); void pill.offsetWidth; pill.classList.add('play');
-  setTimeout(() => pill.classList.remove('play'), 1000);
+  setTimeout(() => pill.classList.remove('play'), 1200);
 }
 function rerender() {
   S.keepScroll = true;
@@ -782,7 +803,7 @@ function bindCommon() {
   document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => go(b.dataset.nav));
   const r = $('#refresh'); if (r) r.onclick = () => load(true);
   const f = $('#fab');
-  if (f) f.onclick = () => ({ home: () => formOp(), money: () => formOp(), cli: () => S.cli.tab === 'all' ? formOp() : formContact(S.cli.tab), debt: () => S.debt.tab === 'debts' ? formDebt() : formOp({ type: 'Расход', cat: 'Доставка и разгрузка' }) })[S.view]();
+  if (f) f.onclick = () => ({ home: () => formOp(), money: () => formOp(), cli: () => formContact(S.cli.tab), debt: () => S.debt.tab === 'debts' ? formDebt() : formOp({ type: 'Расход', cat: 'Доставка и разгрузка' }) })[S.view]();
   document.querySelectorAll('[data-op]').forEach(el => el.onclick = () => opDetail(+el.dataset.op));
   document.querySelectorAll('[data-client]').forEach(el => el.onclick = () => clientPage(el.dataset.client));
   document.querySelectorAll('[data-go]').forEach(el => el.onclick = () => { const [v, k, val] = el.dataset.go.split(':'); if (k) S[v][k] = val === 'true' ? true : val; go(v); });
@@ -998,10 +1019,11 @@ function rpBreakdown(title, groups, total, type, kind) {
   const open = S.report.open;
   return '<div class="section-title"><h2>' + title + '</h2><span class="rp-dim">' + money(total) + '</span></div><div class="list">' + groups.map(g => {
     const id = kind + ':' + g.name, isOpen = open === id, share = total ? g.sum / total * 100 : 0;
-    let h = '<div class="row rp-row" data-rp="' + esc(id) + '"><div class="body"><div class="t1">' + esc(g.name) + '</div>' +
+    const card = kind !== 'cat' && g.name && g.name !== '—' && !/^без /i.test(g.name);
+    let h = '<div class="row rp-row" ' + (card ? 'data-rpcp="' + esc(g.name) + '"' : 'data-rp="' + esc(id) + '"') + '><div class="body"><div class="t1">' + esc(g.name) + '</div>' +
       '<div class="rp-bar"><i class="' + (type === 'Приход' ? 'in' : 'out') + '" style="width:' + Math.max(1, share).toFixed(1) + '%"></i></div></div>' +
       '<div class="amt num">' + money(g.sum) + '<small>' + (share < 1 ? '<1' : Math.round(share)) + '% · ' + g.ops.length + ' оп.</small></div></div>';
-    if (isOpen) {
+    if (isOpen && !card) {
       const sub = new Map(); g.ops.forEach(o => { const k = (kind === 'cat' ? (o.cp || o.client) : o.cat) || '—'; sub.set(k, (sub.get(k) || 0) + o.amount); });
       const subs = [...sub.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
       h += '<div class="rp-open">' + (subs.length > 1 ? '<div class="rp-subs">' + subs.map(([k, v]) => '<span>' + esc(k) + ' <b class="num">' + money(v) + '</b></span>').join('') + '</div>' : '') +
@@ -1075,6 +1097,8 @@ function bindReport() {
   $('#rp-from').onchange = e => setDate('from', e.target.value);
   $('#rp-to').onchange = e => setDate('to', e.target.value);
   document.querySelectorAll('[data-rp]').forEach(el => el.onclick = () => { r.open = r.open === el.dataset.rp ? '' : el.dataset.rp; rerender(); haptic(); });
+  // нажатие на клиента или контрагента — его карточка за период отчёта (как в «Клиентах»)
+  document.querySelectorAll('[data-rpcp]').forEach(el => el.onclick = () => { haptic(); clientPage(el.dataset.rpcp, { from: r.from, to: r.to, acc: r.acc }); });
 }
 
 function rpCsv() {
@@ -1280,31 +1304,9 @@ function contactHtml(headers, v, skip) {
 function viewCli() {
   const f = S.cli, q = norm(f.q);
   let h = topbar('Клиенты');
-  h += '<div class="seg">' + [['all', 'Отчёт'], ['clients', 'Клиенты'], ['suppliers', 'Поставщики'], ['drivers', 'Доставщики']].map(([k, t]) => '<button data-ct="' + k + '" class="' + (f.tab === k ? 'on' : '') + '">' + t + '</button>').join('') + '</div>';
+  h += '<div class="seg">' + [['clients', 'Клиенты'], ['suppliers', 'Поставщики'], ['drivers', 'Доставщики']].map(([k, t]) => '<button data-ct="' + k + '" class="' + (f.tab === k ? 'on' : '') + '">' + t + '</button>').join('') + '</div>';
   h += '<div class="search">' + ICONS.search + '<input id="cq" placeholder="Поиск" value="' + esc(f.q) + '"></div>';
-  if (f.tab === 'all') {
-    const PERIODS = [['all', 'Всё время'], ['month', 'Этот месяц'], ['prev', 'Прошлый месяц'], ['year', 'Этот год']];
-    const ROLES = [...new Set((S.data.refs.contractors || []).map(c => c.role).filter(Boolean))];
-    const stats = cpStatsAll(f.period);
-    let names = refNames();
-    if (f.role) names = names.filter(n => cpRole(n) === f.role);
-    if (q) names = names.filter(n => norm(n).includes(q));
-    const st = n => stats.get(cpNorm(n)) || { paid: 0, got: 0, spent: 0, n: 0, debt: 0, last: '' };
-    names.sort((a, b) => { const x = st(a), y = st(b); return (y.paid + y.got + y.spent) - (x.paid + x.got + x.spent) || a.localeCompare(b, 'ru'); });
-    const tot = names.reduce((t, n) => { const x = st(n); t.paid += x.paid; t.got += x.got; t.debt += x.debt; return t; }, { paid: 0, got: 0, debt: 0 });
-    h += '<div class="chips">' + PERIODS.map(([k, t]) => '<button class="chip ' + (f.period === k ? 'on' : '') + '" data-cper="' + k + '">' + t + '</button>').join('') + '</div>';
-    h += '<div class="chips"><button class="chip ' + (!f.role ? 'on' : '') + '" data-crole="">Все</button>' + ROLES.map(r => '<button class="chip ' + (f.role === r ? 'on' : '') + '" data-crole="' + esc(r) + '">' + esc(r) + '</button>').join('') + '</div>';
-    h += '<div class="totals"><div><small>Мы заплатили</small><b class="num">' + money(tot.paid) + '</b></div><div><small>Получили</small><b class="num pos">' + money(tot.got) + '</b></div><div><small>Должны нам</small><b class="num">' + money(tot.debt) + '</b></div></div>';
-    h += '<div class="list">' + (names.length ? names.map(n => {
-      const x = st(n), role = cpRole(n);
-      const main = x.paid >= x.got ? ['заплатили', x.paid, ''] : ['получили', x.got, 'pos'];
-      const sub = [role, x.n ? x.n + ' ' + plural(x.n, 'операция', 'операции', 'операций') : 'нет операций', x.last ? 'посл. ' + short(x.last) : ''].filter(Boolean).join(' · ');
-      const extra = [x.paid && x.got ? (main[0] === 'заплатили' ? 'получили ' + money(x.got) : 'заплатили ' + money(x.paid)) : '', x.spent ? 'на заказы ' + money(x.spent) : '', x.debt ? 'должен ' + money(x.debt) : ''].filter(Boolean).join(' · ');
-      return '<div class="row" data-client="' + esc(n) + '"><div class="ico neutral">' + esc(n.replace(/^Да!\s*/, '').charAt(0)) + '</div><div class="body"><div class="t1">' + esc(n) + '</div><div class="t2">' + esc(sub) + (extra ? '<br>' + esc(extra) : '') + '</div></div>' +
-        '<div class="amt num ' + main[2] + '">' + (x.n ? money(main[1]) + '<small>' + main[0] + '</small>' : '—') + '</div></div>';
-    }).join('') : '<div class="empty">Ничего не нашлось</div>') + '</div>';
-    h += '<div class="stale">Контрагенты из СПРАВОЧНИКА. «Заплатили» — наши расходы на него, «получили» — его оплаты нам, «на заказы» — что потратили на заказы клиента, «должен» — из листа ДОЛГИ.</div>';
-  } else if (f.tab === 'clients') {
+  if (f.tab === 'clients') {
     const fin = cpStatsAll('all');
     let names = clientNames();
     if (q) names = names.filter(n => norm(n).includes(q) || memo('clients').rows.some(r => norm(r.v[0]) === norm(n) && norm(r.v.join(' ')).includes(q)));
@@ -1333,8 +1335,6 @@ function viewCli() {
 const money_ = n => money(n);
 function bindCli() {
   document.querySelectorAll('[data-ct]').forEach(b => b.onclick = () => { S.cli.tab = b.dataset.ct; S.cli.q = ''; rerender(); });
-  document.querySelectorAll('[data-cper]').forEach(b => b.onclick = () => { S.cli.period = b.dataset.cper; rerender(); });
-  document.querySelectorAll('[data-crole]').forEach(b => b.onclick = () => { S.cli.role = b.dataset.crole; rerender(); });
   document.querySelectorAll('[data-contact]').forEach(el => el.onclick = () => {
     const r = memo(S.cli.tab).rows.find(x => x.row === +el.dataset.contact);
     if (r) formContact(S.cli.tab, r);
@@ -1354,7 +1354,7 @@ function payoutsBy(cat, month) {
 }
 function clientPage(name, period) {
   const n = norm(name);
-  period = period || (S.cli.tab === 'all' ? S.cli.period : 'all');
+  period = period || 'all';
   const sx = cpStatsAll(period).get(cpNorm(name)) || { paid: 0, got: 0, spent: 0, mat: 0, del: 0, oth: 0, cats: new Map(), debt: 0 };
   const m = { paid: sx.got, materials: sx.mat, delivery: sx.del, other: sx.oth, spent: sx.spent };
   const role = cpRole(name);
@@ -1364,7 +1364,10 @@ function clientPage(name, period) {
   const margin = m.paid - m.spent;
   let h = '<h3>' + esc(name) + '<button class="x" data-close>×</button></h3>';
   const PER = { all: 'всё время', month: 'этот месяц', prev: 'прошлый месяц', year: 'этот год' };
-  h += '<div class="chips">' + Object.keys(PER).map(k => '<button class="chip ' + (period === k ? 'on' : '') + '" data-pper="' + k + '">' + PER[k].charAt(0).toUpperCase() + PER[k].slice(1) + '</button>').join('') + '</div>';
+  const custom = typeof period === 'object';
+  if (custom) PER.rp = short(period.from) + ' — ' + short(period.to) + (period.acc ? ' · ' + period.acc : '');
+  const perKey = custom ? 'rp' : period;
+  h += '<div class="chips">' + Object.keys(PER).map(k => '<button class="chip ' + (perKey === k ? 'on' : '') + '" data-pper="' + k + '">' + PER[k].charAt(0).toUpperCase() + PER[k].slice(1) + '</button>').join('') + '</div>';
   if (role) h += '<div class="hint" style="margin:0 2px 10px">' + esc(role) + '</div>';
   const isClient = role === 'Клиент' || m.paid > 0 || m.spent > 0;
   if (sx.paid > 0 || !isClient) {
@@ -1382,7 +1385,7 @@ function clientPage(name, period) {
   h += '<div class="section-title"><h2>Операции (' + ops.length + ')</h2></div>';
   h += ops.length ? '<div class="list">' + ops.slice(0, 30).map(opRow).join('') + (ops.length > 30 ? '<button class="more" id="c-all">Все операции в «Деньгах»</button>' : '') + '</div>' : '<div class="list"><div class="empty">Операций нет</div></div>';
   openSheet(h, sh => {
-    sh.querySelectorAll('[data-pper]').forEach(b => b.onclick = () => { closeSheet(true); clientPage(name, b.dataset.pper); });
+    sh.querySelectorAll('[data-pper]').forEach(b => b.onclick = () => { closeSheet(true); clientPage(name, b.dataset.pper === 'rp' ? period : b.dataset.pper); });
     sh.querySelectorAll('[data-op]').forEach(el => el.onclick = () => { closeSheet(); setTimeout(() => opDetail(+el.dataset.op), 260); });
     sh.querySelectorAll('[data-obj]').forEach(el => el.onclick = () => { const r = objs.find(x => x.row === +el.dataset.obj); closeSheet(); setTimeout(() => formContact('clients', r), 260); });
     const ca = $('#c-add', sh); if (ca) ca.onclick = () => { closeSheet(); setTimeout(() => formContact('clients', null, name), 260); };
