@@ -488,7 +488,6 @@ const S = {
   user: null, data: null, loading: false, loadedAt: 0,
   view: 'home',
   money: { type: 'all', acc: '', month: '', q: '', errors: false, limit: 80 },
-  req: { tab: 'active', q: '' },
   cli: { tab: 'all', q: '', role: '', period: 'all' },
   debt: { tab: 'debts', period: 'month' },
   report: { preset: 'month', from: '', to: '', acc: '', open: '' },
@@ -521,7 +520,6 @@ const haptic = t => { try { tg && tg.HapticFeedback && (t === 'ok' ? tg.HapticFe
 const ICONS = {
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>',
   money: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>',
-  req: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg>',
   cli: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></svg>',
   debt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z" opacity="0"/><path d="M7 3h10l3 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z"/><path d="M8.5 12h7M8.5 16h4M4 7h16"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -697,7 +695,7 @@ function cpStatsAll(period) {
 }
 
 // ---------- оболочка ----------
-const NAV = [['home', 'Главная'], ['money', 'Деньги'], ['req', 'Заявки'], ['cli', 'Клиенты'], ['debt', 'Долги']];
+const NAV = [['home', 'Главная'], ['money', 'Деньги'], ['cli', 'Клиенты'], ['debt', 'Долги']];
 function shell(inner, fab) {
   return '<div class="main">' + inner + '</div>' +
     (fab ? '<button class="fab" id="fab" aria-label="Добавить">' + ICONS.plus + '</button>' : '') +
@@ -715,7 +713,7 @@ function render() {
   const app = $('#app');
   if (!S.data) { app.innerHTML = '<div class="boot"><img src="' + LOGO + '" class="boot-logo" alt="SpaceKit"><div class="spinner"></div><p class="hint">Загружаю таблицу…</p></div>'; return; }
   const y = window.scrollY;
-  const views = { home: viewHome, money: viewMoney, req: viewReq, cli: viewCli, debt: viewDebt, report: viewReport };
+  const views = { home: viewHome, money: viewMoney, cli: viewCli, debt: viewDebt, report: viewReport };
   app.innerHTML = (views[S.view] || viewHome)();
   bindCommon();
   if (S.keepScroll) window.scrollTo(0, y);
@@ -743,12 +741,11 @@ function bindCommon() {
   document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => go(b.dataset.nav));
   const r = $('#refresh'); if (r) r.onclick = () => load(true);
   const f = $('#fab');
-  if (f) f.onclick = () => ({ home: () => formOp(), money: () => formOp(), req: () => formRequest(), cli: () => S.cli.tab === 'all' ? formOp() : formContact(S.cli.tab), debt: () => S.debt.tab === 'debts' ? formDebt() : formOp({ type: 'Расход', cat: 'Доставка и разгрузка' }) })[S.view]();
+  if (f) f.onclick = () => ({ home: () => formOp(), money: () => formOp(), cli: () => S.cli.tab === 'all' ? formOp() : formContact(S.cli.tab), debt: () => S.debt.tab === 'debts' ? formDebt() : formOp({ type: 'Расход', cat: 'Доставка и разгрузка' }) })[S.view]();
   document.querySelectorAll('[data-op]').forEach(el => el.onclick = () => opDetail(+el.dataset.op));
-  document.querySelectorAll('[data-reqid]').forEach(el => el.onclick = () => reqDetail(+el.dataset.reqid));
   document.querySelectorAll('[data-client]').forEach(el => el.onclick = () => clientPage(el.dataset.client));
   document.querySelectorAll('[data-go]').forEach(el => el.onclick = () => { const [v, k, val] = el.dataset.go.split(':'); if (k) S[v][k] = val === 'true' ? true : val; go(v); });
-  const binds = { home: bindHome, money: bindMoney, req: bindReq, cli: bindCli, debt: bindDebt, report: bindReport }[S.view];
+  const binds = { home: bindHome, money: bindMoney, cli: bindCli, debt: bindDebt, report: bindReport }[S.view];
   if (binds) binds();
 }
 
@@ -768,9 +765,6 @@ function viewHome() {
   const company = dashCard(/БАЛАНС КОМПАНИИ/);
   const inc = dashCard(/ПОСТУПЛЕНИЯ/), out = dashCard(/ВЫПЛАТЫ|РАСХОДЫ ЗА/);
   const people = (d.dash || []).filter(c => c !== company && c !== inc && c !== out);
-  const t = todayISO(), tm = addDays(t, 1);
-  const soon = (d.requests || []).filter(r => ['Новая', 'Закуплено', 'В доставке'].includes(r.status) && r.date && r.date <= tm)
-    .sort((a, b) => a.date.localeCompare(b.date));
   let h = '<div class="home-head">' +
     (S.user.role === 'owner' ? '<button class="icon-btn" id="access" aria-label="Доступ">' + ICONS.people + '</button>' : '<span class="icon-ph"></span>') +
     '<img class="home-logo" src="' + LOGO + '" alt="SpaceKit">' +
@@ -785,10 +779,8 @@ function viewHome() {
   h += d.errors > 0
     ? '<div class="banner" data-go="money:errors:true">⚠️ <span>В журнале ' + d.errors + ' ' + plural(d.errors, 'строка', 'строки', 'строк') + ' с ошибками. Нажми, чтобы посмотреть</span></div>'
     : '<div class="banner ok">✓ Все операции заполнены без ошибок</div>';
-  h += '<div class="quick"><button id="q-op">+ Операция</button><button id="q-req">+ Заявка</button><button id="q-debt">+ Долг</button></div>';
+  h += '<div class="quick"><button id="q-op">+ Операция</button><button id="q-debt">+ Долг</button></div>';
   h += '<div class="section-title"><h2>Балансы</h2></div><div class="grid2" style="margin-top:0">' + people.map(c => cardHtml(c)).join('') + '</div>';
-  h += '<div class="section-title"><h2>Доставки сегодня и завтра</h2><button data-go="req:tab:soon">Все</button></div>';
-  h += soon.length ? '<div class="list">' + soon.slice(0, 5).map(reqRow).join('') + '</div>' : '<div class="list"><div class="empty">Нет доставок на сегодня и завтра</div></div>';
   h += '<div class="section-title"><h2>Последние операции</h2><button data-go="money">Все</button></div>';
   const recent = d.ops.slice().sort((a, b) => b.row - a.row).slice(0, 8);
   h += '<div class="list">' + recent.map(opRow).join('') + '</div>';
@@ -799,7 +791,6 @@ function bindHome() {
   $('#q-op').onclick = () => formOp();
   $('#q-report').onclick = () => go('report');
   $('#theme').onclick = cycleTheme;
-  $('#q-req').onclick = () => formRequest();
   $('#q-debt').onclick = () => formDebt();
   const a = $('#access'); if (a) a.onclick = accessScreen;
 }
@@ -1232,109 +1223,6 @@ function formOp(pre = {}) {
 
 // ---------- ЗАЯВКИ ----------
 const STATUSES = ['Новая', 'Закуплено', 'В доставке', 'Доставлено', 'Отменена'];
-const ST_CLS = { 'Новая': 's-new', 'Закуплено': 's-bought', 'В доставке': 's-way', 'Доставлено': 's-done', 'Отменена': 's-cancel' };
-function reqRow(r) {
-  const first = (r.items || '').split('\n')[0];
-  return '<div class="row" data-reqid="' + r.id + '"><div class="ico neutral">' + r.id + '</div><div class="body"><div class="t1">' + esc(r.client) + (r.object ? ' · ' + esc(r.object) : '') +
-    '</div><div class="t2">' + esc(first) + '</div></div><div class="amt"><span class="tag ' + (ST_CLS[r.status] || '') + '">' + esc(r.status) + '</span><small>' + esc(r.date ? fmtDay(r.date) : 'без даты') + '</small></div></div>';
-}
-function viewReq() {
-  const f = S.req, q = norm(f.q), t = todayISO(), tm = addDays(t, 1);
-  let list = (S.data.requests || []).slice();
-  if (f.tab === 'active') list = list.filter(r => ['Новая', 'Закуплено', 'В доставке'].includes(r.status));
-  if (f.tab === 'soon') list = list.filter(r => ['Новая', 'Закуплено', 'В доставке'].includes(r.status) && r.date && r.date <= tm);
-  if (q) list = list.filter(r => norm([r.client, r.object, r.items, r.driver, r.comment, r.id].join(' ')).includes(q));
-  list.sort(f.tab === 'all' ? (a, b) => b.id - a.id : (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.id - b.id);
-  let h = topbar('Заявки');
-  h += '<div class="seg">' + [['active', 'В работе'], ['soon', 'Ближайшие'], ['all', 'Все']].map(([k, tt]) => '<button data-rt="' + k + '" class="' + (f.tab === k ? 'on' : '') + '">' + tt + '</button>').join('') + '</div>';
-  h += '<div class="search">' + ICONS.search + '<input id="rq" placeholder="Клиент, объект, товар" value="' + esc(f.q) + '"></div>';
-  h += list.length ? '<div class="list">' + list.map(reqRow).join('') + '</div>' : '<div class="list"><div class="empty">' + (S.data.requests.length ? 'Ничего не нашлось' : 'Заявок пока нет. Нажми «+», чтобы создать первую') + '</div></div>';
-  return shell(h, true);
-}
-function bindReq() {
-  document.querySelectorAll('[data-rt]').forEach(b => b.onclick = () => { S.req.tab = b.dataset.rt; rerender(); });
-  const q = $('#rq'); let t;
-  q.oninput = () => { clearTimeout(t); t = setTimeout(() => { S.req.q = q.value; rerender(); const n = $('#rq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
-}
-function reqDetail(id) {
-  const r = (S.data.requests || []).find(x => x.id === id);
-  if (!r) return;
-  let h = '<h3>Заявка №' + r.id + '<button class="x" data-close>×</button></h3>';
-  h += '<div class="status-btns">' + STATUSES.map(s => '<button data-st="' + s + '" class="' + (r.status === s ? 'on' : '') + '">' + s + '</button>').join('') + '</div>';
-  h += '<dl class="kv">';
-  [['Клиент', r.client], ['Объект', r.object], ['Доставка', r.date ? fmtDay(r.date) + ' (' + r.date.split('-').reverse().join('.') + ')' : 'дата не указана'], ['Доставщик', r.driver], ['Сумма', r.sum ? money(r.sum) : ''], ['Комментарий', r.comment], ['Создал', r.author + (r.created ? ', ' + r.created.replace('T', ' ').slice(5).split(' ').map((x, i) => i ? x : x.split('-').reverse().join('.')).join(' ') : '')]]
-    .forEach(([k, v]) => { if (v) h += '<dt>' + k + '</dt><dd>' + esc(v) + '</dd>'; });
-  h += '</dl><div class="section-title" style="margin-top:16px"><h2>Что везём</h2></div><div class="card" style="white-space:pre-wrap">' + esc(r.items) + '</div>';
-  const obj = memo('clients').rows.find(x => norm(x.v[0]) === norm(r.client) && (!r.object || norm(x.v[objCol()]) === norm(r.object)));
-  if (obj) h += '<div class="section-title"><h2>Контакты объекта</h2></div><div class="card">' + contactHtml(memo('clients').headers, obj.v) + '</div>';
-  h += '<div style="height:14px"></div><button class="btn ghost" id="r-edit">Изменить заявку</button><button class="btn ghost" id="r-client">Карточка клиента</button>';
-  openSheet(h, sh => {
-    sh.querySelectorAll('[data-st]').forEach(b => b.onclick = async () => {
-      if (b.dataset.st === r.status) return;
-      sh.querySelectorAll('[data-st]').forEach(x => x.disabled = true);
-      try { await action('updateRequest', { id: r.id, fields: { status: b.dataset.st } }); r.status = b.dataset.st; haptic('ok'); toast('Статус: ' + b.dataset.st); closeSheet(); await load(true); }
-      catch (e) { toast(e.message); sh.querySelectorAll('[data-st]').forEach(x => x.disabled = false); }
-    });
-    $('#r-edit', sh).onclick = () => { closeSheet(); setTimeout(() => formRequest(r), 260); };
-    $('#r-client', sh).onclick = () => { closeSheet(); setTimeout(() => clientPage(r.client), 260); };
-  });
-}
-function formRequest(r) {
-  const edit = !!(r && r.id);
-  r = r || {};
-  let h = '<h3>' + (edit ? 'Заявка №' + r.id : 'Новая заявка') + '<button class="x" data-close>×</button></h3>';
-  h += '<div class="field"><label>Клиент</label><input id="r-client" list="dl-clients" autocomplete="off" value="' + esc(r.client || '') + '" placeholder="Например, Левар"></div>';
-  h += '<div class="field"><label>Объект</label><input id="r-object" list="dl-objects" autocomplete="off" value="' + esc(r.object || '') + '" placeholder="ЖК, адрес"></div>';
-  h += '<div class="two"><div class="field"><label>Дата доставки</label><input type="date" id="r-date" value="' + esc(r.date || addDays(todayISO(), 1)) + '"></div>';
-  h += '<div class="field"><label>Доставщик</label><input id="r-driver" list="dl-drivers" autocomplete="off" value="' + esc(r.driver || '') + '" placeholder="Кто везёт"></div></div>';
-  h += '<div class="field"><label>Что везём (одна позиция — одна строка)</label><textarea id="r-items" placeholder="Гипсокартон 12,5 мм — 40 листов">' + esc(r.items || '') + '</textarea></div>';
-  h += '<div class="field"><label>Найти товар в МойСклад</label><input id="r-ms" placeholder="Например, профиль 60×27" autocomplete="off"></div><div id="r-ms-res"></div>';
-  h += '<div class="two"><div class="field"><label>Сумма заявки, ₽</label><input id="r-sum" inputmode="decimal" value="' + esc(r.sum || '') + '" placeholder="Необязательно"></div>';
-  h += '<div class="field"><label>Комментарий</label><input id="r-comment" value="' + esc(r.comment || '') + '"></div></div>';
-  h += '<div class="err" id="r-err"></div><button class="btn" id="r-save">' + (edit ? 'Сохранить' : 'Создать заявку') + '</button>';
-  h += '<datalist id="dl-clients">' + clientNames().map(n => '<option value="' + esc(n) + '">').join('') + '</datalist><datalist id="dl-objects"></datalist>';
-  h += '<datalist id="dl-drivers">' + [...new Set(driverNames().concat(deliveryPeople()))].map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
-  openSheet(h, sh => {
-    const cl = $('#r-client', sh), dlo = $('#dl-objects', sh);
-    const fillObjects = () => { dlo.innerHTML = memo('clients').rows.filter(x => norm(x.v[0]) === norm(cl.value) && x.v[objCol()]).map(x => '<option value="' + esc(x.v[objCol()]) + '">').join(''); };
-    cl.oninput = fillObjects; fillObjects();
-    if (!edit) setTimeout(() => cl.focus(), 280);
-    const ms = $('#r-ms', sh), res = $('#r-ms-res', sh); let t, seq = 0;
-    ms.oninput = () => {
-      clearTimeout(t);
-      t = setTimeout(async () => {
-        const q = ms.value.trim(), my = ++seq;
-        if (q.length < 2) { res.innerHTML = ''; return; }
-        res.innerHTML = '<div class="suggest"><div><small>Ищу…</small></div></div>';
-        try {
-          const j = await call('/api/products?q=' + encodeURIComponent(q));
-          if (my !== seq) return;
-          const rows = j.rows || [];
-          res.innerHTML = rows.length ? '<div class="suggest">' + rows.map((p, i) => '<div data-p="' + i + '">' + esc(p.name) + '<br><small>' + (p.price ? money(p.price) : '') + (p.stock != null ? ' · остаток ' + p.stock : '') + '</small></div>').join('') + '</div>' : '<div class="suggest"><div><small>Не нашёл в МойСклад</small></div></div>';
-          res.querySelectorAll('[data-p]').forEach(el => el.onclick = () => {
-            const ta = $('#r-items', sh);
-            ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + rows[+el.dataset.p].name + ' — ';
-            ms.value = ''; res.innerHTML = ''; ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
-          });
-        } catch (e) { res.innerHTML = ''; }
-      }, 350);
-    };
-    $('#r-save', sh).onclick = async () => {
-      const v = k => $('#r-' + k, sh).value.trim();
-      const err = $('#r-err', sh);
-      const q = { client: v('client'), object: v('object'), date: v('date'), driver: v('driver'), items: v('items'), sum: Number(v('sum').replace(/\s/g, '').replace(',', '.')) || '', comment: v('comment') };
-      if (!q.client) { err.textContent = 'Укажи клиента'; return; }
-      if (!q.items) { err.textContent = 'Напиши, что везём'; return; }
-      const btn = $('#r-save', sh); btn.disabled = true; btn.textContent = 'Сохраняю…';
-      try {
-        if (edit) await action('updateRequest', { id: r.id, fields: q });
-        else { const x = await action('addRequest', { request: q }); toast('Заявка №' + x.id + ' создана'); }
-        haptic('ok'); closeSheet(); S.view = 'req'; await load(true);
-      } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = edit ? 'Сохранить' : 'Создать заявку'; }
-    };
-  });
-}
-const deliveryPeople = () => [...new Set(S.data.ops.filter(o => o.cat === 'Доставка и разгрузка' && o.cp).map(o => o.cp))];
 
 // ---------- КЛИЕНТЫ И КОНТАКТЫ ----------
 function contactHtml(headers, v, skip) {
@@ -1431,7 +1319,6 @@ function clientPage(name, period) {
   const role = cpRole(name);
   const [pFrom, pTo] = cpPeriod(period);
   const objs = memo('clients').rows.filter(r => norm(r.v[0]) === n);
-  const reqs = (S.data.requests || []).filter(r => norm(r.client) === n).sort((a, b) => b.id - a.id);
   const ops = S.data.opsDesc.filter(o => (norm(o.cp) === n || norm(o.client) === n) && (!pFrom || (o.date >= pFrom && o.date <= pTo)));
   const margin = m.paid - m.spent;
   let h = '<h3>' + esc(name) + '<button class="x" data-close>×</button></h3>';
@@ -1451,17 +1338,13 @@ function clientPage(name, period) {
   if (isClient) h += '<div class="card" style="margin-top:10px"><dl class="kv"><dt>Материалы</dt><dd class="num">' + money(m.materials) + '</dd><dt>Доставка</dt><dd class="num">' + money(m.delivery) + '</dd><dt>Прочее</dt><dd class="num">' + money(m.other) + '</dd><dt>Всего расходов</dt><dd class="num">' + money(m.spent) + '</dd></dl>' +
     (m.paid ? '<div class="pbar"><i style="width:' + Math.min(100, Math.round(m.spent / m.paid * 100)) + '%"></i></div>' : '') + '</div>';
   if (isClient) h += '<div class="section-title"><h2>Объекты и контакты</h2><button id="c-add">+ Объект</button></div>' + (objs.length ? objs.map(r => '<div class="card" data-obj="' + r.row + '"><b>' + esc(r.v[objCol()] || 'Объект без названия') + '</b><div style="height:6px"></div>' + contactHtml(memo('clients').headers, r.v, [0, objCol()]) + '</div>').join('') : '<div class="list"><div class="empty">Контактов в памятке нет</div></div>');
-  if (isClient) h += '<div class="section-title"><h2>Заявки</h2><button id="c-req">+ Заявка</button></div>' +
-    (reqs.length ? '<div class="list">' + reqs.slice(0, 10).map(reqRow).join('') + '</div>' : '<div class="list"><div class="empty">Заявок нет</div></div>');
   h += '<div class="section-title"><h2>Операции (' + ops.length + ')</h2></div>';
   h += ops.length ? '<div class="list">' + ops.slice(0, 30).map(opRow).join('') + (ops.length > 30 ? '<button class="more" id="c-all">Все операции в «Деньгах»</button>' : '') + '</div>' : '<div class="list"><div class="empty">Операций нет</div></div>';
   openSheet(h, sh => {
     sh.querySelectorAll('[data-pper]').forEach(b => b.onclick = () => { closeSheet(true); clientPage(name, b.dataset.pper); });
     sh.querySelectorAll('[data-op]').forEach(el => el.onclick = () => { closeSheet(); setTimeout(() => opDetail(+el.dataset.op), 260); });
-    sh.querySelectorAll('[data-reqid]').forEach(el => el.onclick = () => { closeSheet(); setTimeout(() => reqDetail(+el.dataset.reqid), 260); });
     sh.querySelectorAll('[data-obj]').forEach(el => el.onclick = () => { const r = objs.find(x => x.row === +el.dataset.obj); closeSheet(); setTimeout(() => formContact('clients', r), 260); });
     const ca = $('#c-add', sh); if (ca) ca.onclick = () => { closeSheet(); setTimeout(() => formContact('clients', null, name), 260); };
-    const cr = $('#c-req', sh); if (cr) cr.onclick = () => { closeSheet(); setTimeout(() => formRequest({ client: name }), 260); };
     const all = $('#c-all', sh); if (all) all.onclick = () => { closeSheet(); Object.assign(S.money, { q: name, type: 'all', acc: '', month: '', errors: false }); go('money'); };
   });
 }
