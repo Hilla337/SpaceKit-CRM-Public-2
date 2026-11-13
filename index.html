@@ -486,6 +486,33 @@ img { transition: opacity .3s ease; }
 .rp-open-btn:active svg { animation: bars .5s ease both; transform-origin: 50% 100%; }
 @keyframes bars { 0%, 100% { transform: none; } 40% { transform: scaleY(.6); } 70% { transform: scaleY(1.12); } }
 @media (prefers-reduced-motion: reduce) { .bills { display: none; } }
+
+/* ---------- поиск в отчёте ---------- */
+.rp-search { position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 6; box-shadow: 0 6px 18px rgba(0, 0, 0, .06); transition: box-shadow .3s ease, border-color .2s ease; }
+.rp-search:focus-within { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft), 0 6px 18px rgba(0, 0, 0, .08); }
+.rp-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; padding: 12px 0; font: inherit; font-size: 16px; color: var(--text); }
+.rp-clear { border: 0; background: var(--surface-2); color: var(--muted); width: 24px; height: 24px; border-radius: 50%; font-size: 17px; line-height: 1; cursor: pointer;
+  opacity: 0; transform: scale(.6); pointer-events: none; transition: opacity .2s ease, transform .25s cubic-bezier(.3, 1.4, .5, 1); }
+.rp-clear.show { opacity: 1; transform: none; pointer-events: auto; }
+.rp-found { font-size: 12.5px; color: var(--muted); padding: 0 4px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .3s ease, opacity .25s ease, margin .3s ease; }
+.rp-found.show { max-height: 22px; opacity: 1; margin: -2px 0 6px; }
+/* остальные блоки сворачиваются по высоте */
+.rp-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .45s cubic-bezier(.2, .8, .2, 1), opacity .3s ease; }
+.rp-fold-in { min-height: 0; overflow: hidden; }
+.rp-searching .rp-fold { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
+/* строки контрагентов тают и схлопываются */
+.rp-cpsec .rp-row { max-height: 96px; overflow: hidden;
+  transition: max-height .35s cubic-bezier(.2, .8, .2, 1), opacity .25s ease, padding .35s cubic-bezier(.2, .8, .2, 1), transform .3s ease, border-color .3s ease, background-color .18s ease; }
+.rp-cpsec .rp-row.rp-hide { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-bottom-color: transparent; border-bottom-width: 0; transform: translateX(-10px); pointer-events: none; }
+.rp-cpsec .list { transition: border-color .3s ease, box-shadow .3s ease; }
+.rp-cpsec.rp-empty .list { border-color: transparent; box-shadow: none; }
+.rp-cpsec .section-title { transition: opacity .3s ease; }
+.rp-none { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .35s ease, opacity .3s ease; }
+.rp-none > div { min-height: 0; overflow: hidden; color: var(--muted); font-size: 13px; text-align: center; }
+.rp-cpsec.rp-empty .rp-none { grid-template-rows: 1fr; opacity: 1; }
+.rp-cpsec.rp-empty .rp-none > div { padding: 10px 0 4px; }
+.rp-row mark { background: var(--orange-soft); color: inherit; border-radius: 4px; padding: 0 1px; }
+.rp-noanim .rp-fold, .rp-noanim .rp-row, .rp-noanim .rp-found, .rp-noanim .rp-none { transition: none !important; }
 </style>
 <script>
 (function () {
@@ -541,7 +568,7 @@ const S = {
   money: { type: 'all', acc: '', month: '', q: '', errors: false, limit: 80 },
   cli: { tab: 'clients', q: '' },
   debt: { tab: 'debts', period: 'month' },
-  report: { preset: 'month', from: '', to: '', acc: '', open: '' },
+  report: { preset: 'month', from: '', to: '', acc: '', open: '', q: '' },
 };
 
 // ---------- утилиты ----------
@@ -1050,6 +1077,9 @@ function viewReport() {
   h += '<div class="chips rp-presets">' + RP_PRESETS.map(([k, t]) => '<button class="chip ' + (r.preset === k ? 'on' : '') + '" data-rpp="' + k + '">' + t + '</button>').join('') + '</div>';
   h += '<div class="rp-dates"><label>с <input type="date" id="rp-from" value="' + r.from + '" max="' + r.to + '"></label><label>по <input type="date" id="rp-to" value="' + r.to + '" min="' + r.from + '"></label></div>';
   h += '<div class="chips"><button class="chip ' + (!r.acc ? 'on' : '') + '" data-rpa="">Все счета</button>' + accs.map(a => '<button class="chip ' + (r.acc === a ? 'on' : '') + '" data-rpa="' + esc(a) + '">' + esc(a) + '</button>').join('') + '</div>';
+  h += '<div class="search rp-search">' + ICONS.search + '<input id="rpq" placeholder="Найти контрагента или клиента" autocomplete="off" autocorrect="off" spellcheck="false" value="' + esc(r.q || '') + '">' +
+    '<button class="rp-clear" id="rpq-x" aria-label="Очистить">×</button></div><div class="rp-found" id="rp-found"></div>';
+  h += '<div class="rp-fold"><div class="rp-fold-in">';
 
   h += '<div class="card hero"><div class="label">Чистый денежный поток</div><div class="value num ' + (net < 0 ? 'neg' : 'pos') + '">' + money(net, true) + '</div>' +
     '<div class="sub">' + rpDate(r.from) + ' — ' + rpDate(r.to) + ' · ' + len + ' ' + plural(len, 'день', 'дня', 'дней') + ' · ' + cur.ops.length + ' ' + plural(cur.ops.length, 'операция', 'операции', 'операций') + '</div>' +
@@ -1058,13 +1088,16 @@ function viewReport() {
     '<div class="card kpi"><div class="label">Расходы</div><div class="value num">' + money(cur.out) + '</div><div class="sub">' + rpDelta(cur.out, prev.out, true) + '</div></div></div>';
   if (cur.bad) h += '<div class="banner">⚠️ <span>' + cur.bad + ' ' + plural(cur.bad, 'операция', 'операции', 'операций') + ' за период с ошибками — итоги могут быть неточными</span></div>';
 
-  if (!cur.ops.length) return shell(h + '<div class="list" style="margin-top:12px"><div class="empty">За этот период операций нет</div></div>', false);
+  if (!cur.ops.length) return shell(h + '</div></div><div class="list" style="margin-top:12px"><div class="empty">За этот период операций нет</div></div>', false);
 
   h += '<div class="section-title"><h2>Динамика</h2></div>' + rpChart(cur.ops, r.from, r.to);
   h += rpBreakdown('Поступления по статьям', rpGroup(cur.ops, 'Приход', o => o.cat), cur.inc, 'Приход', 'cat');
   h += rpBreakdown('Расходы по статьям', rpGroup(cur.ops, 'Расход', o => o.cat), cur.out, 'Расход', 'cat');
-  h += rpBreakdown('Поступления от клиентов', rpGroup(cur.ops, 'Приход', o => o.client || o.cp), cur.inc, 'Приход', 'cli');
-  h += rpBreakdown('Кому платили', rpGroup(cur.ops, 'Расход', o => o.cp), cur.out, 'Расход', 'cp');
+  h += '</div></div>';
+  // клиенты и контрагенты — то, что ищем; остальное при поиске плавно сворачивается
+  h += '<div class="rp-cpsec">' + rpBreakdown('Поступления от клиентов', rpGroup(cur.ops, 'Приход', o => o.client || o.cp), cur.inc, 'Приход', 'cli') + '<div class="rp-none"><div>Среди клиентов не нашлось</div></div></div>';
+  h += '<div class="rp-cpsec">' + rpBreakdown('Кому платили', rpGroup(cur.ops, 'Расход', o => o.cp), cur.out, 'Расход', 'cp') + '<div class="rp-none"><div>Среди получателей не нашлось</div></div></div>';
+  h += '<div class="rp-fold"><div class="rp-fold-in">';
 
   if (!r.acc) {
     const byAcc = new Map();
@@ -1073,7 +1106,8 @@ function viewReport() {
       [...byAcc.entries()].sort((a, b) => (b[1].inc + b[1].out) - (a[1].inc + a[1].out)).map(([k, v]) =>
         '<div class="rp-tbl"><span>' + esc(k || '—') + '</span><span class="num pos">' + money(v.inc) + '</span><span class="num">' + money(v.out) + '</span><b class="num ' + (v.inc - v.out < 0 ? 'neg' : '') + '">' + money(v.inc - v.out, true) + '</b></div>').join('') + '</div>';
   }
-  h += '<div class="stale">Переводы между счетами в отчёт не входят — это не приход и не расход компании</div>';
+  h += '<div class="stale" style="margin-bottom:0">Переводы между счетами в отчёт не входят — это не приход и не расход компании</div>';
+  h += '</div></div>';
   return shell(h, false);
 }
 
@@ -1099,6 +1133,46 @@ function bindReport() {
   document.querySelectorAll('[data-rp]').forEach(el => el.onclick = () => { r.open = r.open === el.dataset.rp ? '' : el.dataset.rp; rerender(); haptic(); });
   // нажатие на клиента или контрагента — его карточка за период отчёта (как в «Клиентах»)
   document.querySelectorAll('[data-rpcp]').forEach(el => el.onclick = () => { haptic(); clientPage(el.dataset.rpcp, { from: r.from, to: r.to, acc: r.acc }); });
+  // поиск по контрагентам: без перерисовки страницы — строки плавно прячутся и проявляются
+  const q = $('#rpq');
+  if (q) {
+    q.oninput = () => rpSearch(q.value);
+    q.onfocus = () => { if (!q.value) q.closest('.rp-search').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    $('#rpq-x').onclick = () => { q.value = ''; rpSearch(''); q.focus(); haptic(); };
+    rpSearch(r.q || '', true);
+  }
+}
+function rpSearch(raw, instant) {
+  S.report.q = raw;
+  const q = cpNorm(raw), main = $('.main');
+  if (!main) return;
+  if (instant) main.classList.add('rp-noanim');
+  main.classList.toggle('rp-searching', !!q);
+  $('#rpq-x').classList.toggle('show', !!raw);
+  const hit = name => {
+    const n = cpNorm(name);
+    if (!q || n.includes(q)) return true;
+    // опечатка в 1 букву тоже находит: «мирш» → Мируш
+    return q.length >= 4 && n.split(' ').some(w => cpDist(q, w) <= 1 || (w.length > q.length && cpDist(q, w.slice(0, q.length)) <= 1));
+  };
+  let total = 0;
+  document.querySelectorAll('.rp-cpsec').forEach(sec => {
+    let n = 0;
+    sec.querySelectorAll('[data-rpcp]').forEach(row => {
+      const name = row.dataset.rpcp, ok = hit(name), t1 = row.querySelector('.t1');
+      row.classList.toggle('rp-hide', !ok);
+      if (ok) n++;
+      // подсветить совпадение
+      const nn = cpNorm(name), at = q ? nn.indexOf(q) : -1;
+      t1.innerHTML = at >= 0 ? esc(name.slice(0, at)) + '<mark>' + esc(name.slice(at, at + q.length)) + '</mark>' + esc(name.slice(at + q.length)) : esc(name);
+    });
+    sec.classList.toggle('rp-empty', !!q && !n);
+    total += n;
+  });
+  const f = $('#rp-found');
+  f.textContent = q ? (total ? 'Нашлось: ' + total : 'Ничего не нашлось — проверь написание') : '';
+  f.classList.toggle('show', !!q);
+  if (instant) requestAnimationFrame(() => requestAnimationFrame(() => main.classList.remove('rp-noanim')));
 }
 
 function rpCsv() {
