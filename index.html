@@ -1468,11 +1468,9 @@ function opDetail(row) {
   if (o.cp) h += '<button class="btn ghost" id="d-cp">Все операции: ' + esc(o.cp) + '</button>';
   const canEdit = S.user.role === 'owner' || myAccounts().includes(o.acc);
   if (canEdit) h += '<button class="btn" id="d-edit">' + ICONS.edit + 'Изменить</button>';
-  h += '<button class="btn ghost" id="d-copy">Повторить запись</button>';
   if (S.user.role === 'owner') h += '<button class="btn danger" id="d-del">Удалить строку из таблицы</button>';
   openSheet(h, sh => {
     const cp = $('#d-cp', sh); if (cp) cp.onclick = () => { closeSheet(); Object.assign(S.money, { q: o.cp, type: 'all', acc: '', month: '', errors: false }); go('money'); };
-    $('#d-copy', sh).onclick = () => { closeSheet(); setTimeout(() => formOp({ type: o.type, acc: o.acc, to: o.to, cat: o.cat, cp: o.cp, client: o.client, comment: o.comment }), 260); };
     const ed = $('#d-edit', sh);
     if (ed) ed.onclick = () => { closeSheet(); setTimeout(() => formOp({ type: o.type, amount: String(o.amount), acc: o.acc, to: o.to, date: o.date, cat: o.cat, cp: o.cp, client: o.client, comment: o.comment }, o), 300); };
     const del = $('#d-del', sh);
