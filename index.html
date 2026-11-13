@@ -608,6 +608,19 @@ html.app-in .fab { animation: fabIn .8s cubic-bezier(.3, 1.35, .5, 1) .45s both;
 /* ---------- правка записи ---------- */
 .field .changed { border-color: var(--orange) !important; box-shadow: 0 0 0 3px var(--orange-soft); }
 #d-edit { display: flex; align-items: center; justify-content: center; }
+
+/* ---------- крестик «очистить» в полях ---------- */
+.clr-wrap { position: relative; }
+.clr-wrap input { padding-right: 40px !important; }
+.inp-clear { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--surface-2); color: var(--muted); opacity: 0; transform: scale(.5) rotate(-90deg); pointer-events: none;
+  transition: opacity .2s ease, transform .3s cubic-bezier(.3, 1.4, .5, 1), background-color .18s ease, color .18s ease; }
+.inp-clear svg { width: 12px; height: 12px; }
+.inp-clear.show { opacity: 1; transform: none; pointer-events: auto; }
+.inp-clear:active { transform: scale(.85); background: var(--orange-soft); color: var(--orange-strong); }
+.clr-wrap .inp-clear { position: absolute; right: 10px; top: 50%; margin-top: -12px; }
+.clr-wrap .inp-clear:not(.show) { transform: scale(.5) rotate(-90deg); }
+.clr-wrap .inp-clear.show:active { transform: scale(.85); }
 </style>
 <script>
 (function () {
@@ -937,6 +950,34 @@ function topbar(title, extra) {
     (extra || '') + '<button class="icon-btn' + (S.loading ? ' spin' : '') + '" id="refresh" aria-label="Обновить">' + ICONS.refresh + '</button></div>';
 }
 
+// Крестик «очистить» в полях поиска и в полях контрагента/клиента: появляется, когда в поле есть текст
+const CLEAR_SEL = '.search input:not(#rpq), #f-cp, #f-client';
+function addClearButtons(root) {
+  (root || document).querySelectorAll(CLEAR_SEL).forEach(inp => {
+    if (inp.dataset.clr) return;
+    inp.dataset.clr = '1';
+    let host = inp.parentElement;
+    if (!host.classList.contains('search')) {   // поле формы — оборачиваем, чтобы крестик встал внутри поля
+      const w = document.createElement('div'); w.className = 'clr-wrap';
+      inp.parentNode.insertBefore(w, inp); w.appendChild(inp); host = w;
+    }
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'inp-clear'; b.setAttribute('aria-label', 'Очистить'); b.tabIndex = -1;
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+    host.appendChild(b);
+    const sync = () => b.classList.toggle('show', !!inp.value);
+    inp.addEventListener('input', sync); inp.addEventListener('change', sync); sync();
+    b.addEventListener('pointerdown', e => e.preventDefault());   // не терять фокус и клавиатуру
+    b.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      inp.value = ''; sync(); haptic();
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+      inp.focus();
+    });
+  });
+}
+try { new MutationObserver(() => addClearButtons()).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) {}
+
 function render() {
   if (S.gated) return;
   const app = $('#app');
@@ -973,7 +1014,7 @@ function rerender() {
 }
 // время последнего нажатия: по нему понимаем, что экран меняется от действия пользователя, а не от набора текста
 let lastTap = 0;
-document.addEventListener('click', e => { if (!e.target.closest('input, textarea, select')) lastTap = Date.now(); }, true);
+document.addEventListener('click', e => { if (!e.target.closest('input, textarea, select, .inp-clear')) lastTap = Date.now(); }, true);
 
 function bindCommon() {
   document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => go(b.dataset.nav));
