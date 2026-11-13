@@ -578,15 +578,37 @@ html.app-in .fab { animation: fabIn .8s cubic-bezier(.3, 1.35, .5, 1) .45s both;
 @keyframes navIn { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fabIn { from { opacity: 0; transform: scale(.4) rotate(-90deg); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .spl-shine, .spl-glow { animation: none; } }
+
+/* ---------- бежевая тема: цвет логотипа SpaceKit ---------- */
+:root[data-theme="beige"] {
+  color-scheme: light;
+  --bg: #E3DFD6; --surface: #EEEBE4; --surface-2: #E8E4DC; --line: #D2CCC0;
+  --text: #191816; --muted: #6D675D; --beige-deep: #D8D3C8;
+  --orange: #D9651C; --orange-strong: #B9520F; --orange-soft: #F1DCC9;
+  --green: #2D7A48; --green-soft: #D9E6D7; --red: #BC3E2C; --red-soft: #EFD7CF;
+  --amber: #A9741B; --amber-soft: #EFE0C4;
+  --blue: #8E877B; --blue-strong: #191816; --blue-soft: #DDD8CE; --blue-softer: #DDD8CE;
+  --shadow: none;
+}
+:root[data-theme="beige"] .nav { background: rgba(232, 228, 220, .92); border-top-color: var(--line); -webkit-backdrop-filter: saturate(140%) blur(16px); backdrop-filter: saturate(140%) blur(16px); }
+:root[data-theme="beige"] .seg { background: #D8D3C8; }
+:root[data-theme="beige"] .seg button.on { background: var(--surface); box-shadow: 0 1px 2px rgba(60, 45, 20, .08); }
+:root[data-theme="beige"] .chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+:root[data-theme="beige"] .toast { background: #191816; color: #EEEBE4; }
+:root[data-theme="beige"] .overlay { background: rgba(40, 32, 20, .35); }
+:root[data-theme="beige"] .skeleton { background: linear-gradient(90deg, #E8E4DC, #F2EFE9, #E8E4DC); background-size: 200% 100%; }
+:root[data-theme="beige"] .pill-cli .p1 circle, :root[data-theme="beige"] .pill-cli .p1 path,
+:root[data-theme="beige"] .pill-money svg rect, :root[data-theme="beige"] .bills i { fill: #E8E4DC; background: #E8E4DC; }
+:root[data-theme="beige"] .spl-glow { background: radial-gradient(circle, rgba(217, 101, 28, .16), rgba(217, 101, 28, .05) 45%, rgba(217, 101, 28, 0) 68%); }
 </style>
 <script>
 (function () {
-  var m = 'auto'; try { m = localStorage.getItem('sk-crm-theme') || 'auto'; } catch (e) {}
-  var tg = window.Telegram && Telegram.WebApp;
-  var sys = (tg && tg.colorScheme) ? tg.colorScheme === 'dark' : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-  var dark = m === 'dark' || (m === 'auto' && sys);
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  var mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.setAttribute('content', dark ? '#000000' : '#F4F5F7');
+  var m = ''; try { m = localStorage.getItem('sk-crm-theme') || ''; } catch (e) {}
+  if (m !== 'light' && m !== 'dark' && m !== 'beige') {   // выбора ещё не было (или стояло старое «как в системе») — начинаем с системной
+    m = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', m);
+  var mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.setAttribute('content', { light: '#F4F5F7', dark: '#000000', beige: '#E3DFD6' }[m]);
 })();
 </script>
 </head>
@@ -1001,23 +1023,28 @@ const plural = (n, a, b, c) => { n = Math.abs(n) % 100; const m = n % 10; return
 
 // ---------- ТЕМА ----------
 const THEME_ICONS = {
-  auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>',
   light: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>'
 };
-const THEME_NAMES = { auto: 'Тема как в системе', light: 'Светлая тема', dark: 'Тёмная тема' };
-function themeMode() { try { return localStorage.getItem('sk-crm-theme') || 'auto'; } catch (e) { return 'auto'; } }
+THEME_ICONS.beige = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.8-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-4.6-4-8.2-9-8.2z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg>';
+const THEME_NAMES = { light: 'Светлая тема', beige: 'Бежевая тема', dark: 'Тёмная тема' };
+const THEME_BG = { light: '#F4F5F7', beige: '#E3DFD6', dark: '#000000' };
+const THEME_BAR = { light: '#FFFFFF', beige: '#E8E4DC', dark: '#000000' };
+// Три темы: светлая → бежевая (цвет логотипа) → тёмная
+function themeMode() {
+  let m = ''; try { m = localStorage.getItem('sk-crm-theme') || ''; } catch (e) {}
+  if (THEME_NAMES[m]) return m;
+  return (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
 function applyTheme() {
   const m = themeMode(), tg = window.Telegram && Telegram.WebApp;
-  const sys = (tg && tg.colorScheme) ? tg.colorScheme === 'dark' : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-  const dark = m === 'dark' || (m === 'auto' && sys);
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  const bg = dark ? '#000000' : '#F4F5F7';
+  document.documentElement.setAttribute('data-theme', m);
+  const bg = THEME_BG[m];
   const mt = document.querySelector('meta[name=theme-color]'); if (mt) mt.setAttribute('content', bg);
-  try { if (tg && tg.setHeaderColor) { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); if (tg.setBottomBarColor) tg.setBottomBarColor(dark ? '#000000' : '#FFFFFF'); } } catch (e) {}
+  try { if (tg && tg.setHeaderColor) { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); if (tg.setBottomBarColor) tg.setBottomBarColor(THEME_BAR[m]); } } catch (e) {}
 }
 function cycleTheme() {
-  const order = ['auto', 'light', 'dark'], next = order[(order.indexOf(themeMode()) + 1) % 3];
+  const order = ['light', 'beige', 'dark'], next = order[(order.indexOf(themeMode()) + 1) % 3];
   try { localStorage.setItem('sk-crm-theme', next); } catch (e) {}
   smoothTheme(() => { applyTheme(); render(); });
   toast(THEME_NAMES[next]);
@@ -1037,7 +1064,8 @@ function smoothTheme(change) {
   S.keepScroll = true; change();
   setTimeout(() => html.classList.remove('theme-anim'), 500);
 }
-try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themeMode() === 'auto') smoothTheme(() => { applyTheme(); render(); }); }); } catch (e) {}
+// пока тему не выбирали руками — следуем за системой
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { let m = ''; try { m = localStorage.getItem('sk-crm-theme') || ''; } catch (e) {} if (!THEME_NAMES[m]) smoothTheme(() => { applyTheme(); render(); }); }); } catch (e) {}
 try { window.Telegram && Telegram.WebApp && Telegram.WebApp.onEvent && Telegram.WebApp.onEvent('themeChanged', applyTheme); } catch (e) {}
 
 // ---------- ПОДСКАЗКИ ----------
